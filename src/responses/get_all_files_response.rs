@@ -1,0 +1,17 @@
+use serde::Serialize;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileResponse {
+    pub file_type: String,
+    pub file_path: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAllFilesCommandResponse {
+    pub command: String,
+    pub cwd: String,
+    pub files: Vec<FileResponse>,
+    pub files_count: usize,
+}
