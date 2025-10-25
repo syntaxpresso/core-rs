@@ -7,21 +7,12 @@ use crate::{
 
 pub fn execute(cwd: PathBuf) -> Response<GetAllFilesCommandResponse> {
     let cwd_string = cwd.display().to_string();
-    match std::panic::catch_unwind(|| {
-        let files = run(&cwd);
-        let files_size = files.len();
-        GetAllFilesCommandResponse {
-            files,
-            files_count: files_size,
+    match run(&cwd) {
+        Ok(files) => {
+            let files_count = files.len();
+            let response = GetAllFilesCommandResponse { files, files_count };
+            Response::success("get-all-files".to_string(), cwd_string, response)
         }
-    }) {
-        Ok(response) => {
-            Response::success("get-all-files".to_string(), cwd_string.clone(), response)
-        }
-        Err(_) => Response::error(
-            "get-all-files".to_string(),
-            cwd_string,
-            "Failed to execute get-all-files command".to_string(),
-        ),
+        Err(error_msg) => Response::error("get-all-files".to_string(), cwd_string, error_msg),
     }
 }

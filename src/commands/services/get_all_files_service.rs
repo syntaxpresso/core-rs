@@ -8,7 +8,13 @@ use crate::{
     responses::get_all_files_response::FileResponse,
 };
 
-pub fn run(cwd: &Path) -> Vec<FileResponse> {
+pub fn run(cwd: &Path) -> Result<Vec<FileResponse>, String> {
+    if !cwd.exists() {
+        return Err(format!("Directory does not exist: {}", cwd.display()));
+    }
+    if !cwd.is_dir() {
+        return Err(format!("Path is not a directory: {}", cwd.display()));
+    }
     let mut files = Vec::new();
     let ts_files = parse_all_files(cwd);
     for ts_file in ts_files {
@@ -31,5 +37,5 @@ pub fn run(cwd: &Path) -> Vec<FileResponse> {
         };
         files.push(found_file);
     }
-    files
+    Ok(files)
 }
