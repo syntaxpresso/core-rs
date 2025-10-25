@@ -55,7 +55,7 @@ impl TSFile {
     fn get_node_from_position(&self, line: usize, column: usize) -> Option<Node<'_>> {
         if let Some(tree) = &self.tree {
             let root = tree.root_node();
-            let point = Point::new(line - 1, column - 1);
+            let point = Point::new(line.saturating_sub(1), column.saturating_sub(1));
             root.named_descendant_for_point_range(point, point)
         } else {
             None
@@ -71,7 +71,7 @@ impl TSFile {
     ) -> Option<Node<'_>> {
         if let Some(tree) = &self.tree {
             let root = tree.root_node();
-            let point = Point::new(line - 1, column - 1);
+            let point = Point::new(line.saturating_sub(1), column.saturating_sub(1));
             // Try to find the exact node at this position
             if let Some(node) = root.named_descendant_for_point_range(point, point) {
                 if node.kind() == expected_kind {
@@ -306,5 +306,103 @@ impl TSFile {
         Ok(nodes)
     }
 
+    /// Convert byte position to line/column (1-based)
+    fn byte_position_to_point(&self, byte_position: usize) -> Point {
+        let mut row = 0;
+        let mut col = 0;
+        for (i, ch) in self.source_code.char_indices() {
+            if i >= byte_position {
+                break;
+            }
+            if ch == '\n' {
+                row += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+        }
+        Point::new(row, col)
+    }
 
+    /// Find a node by byte position
+    pub fn get_node_at_byte_position(&self, byte_position: usize) -> Option<Node<'_>> {
+        if let Some(tree) = &self.tree {
+            let root = tree.root_node();
+            let point = self.byte_position_to_point(byte_position);
+            root.descendant_for_point_range(point, point)
+        } else {
+            None
+        }
+    }
+
+    /// Find a named node by byte position
+    pub fn get_named_node_at_byte_position(&self, byte_position: usize) -> Option<Node<'_>> {
+        if let Some(tree) = &self.tree {
+            let root = tree.root_node();
+            let point = self.byte_position_to_point(byte_position);
+            root.named_descendant_for_point_range(point, point)
+        } else {
+            None
+        }
+    }
+
+    /// Find a node by byte position with specific kind
+    pub fn get_node_at_byte_position_with_kind(
+        &self,
+        byte_position: usize,
+        expected_kind: &str,
+    ) -> Option<Node<'_>> {
+        if let Some(tree) = &self.tree {
+            let root = tree.root_node();
+            let point = self.byte_position_to_point(byte_position);
+            // Try to find the exact node at this position
+            if let Some(node) = root.descendant_for_point_range(point, point) {
+                if node.kind() == expected_kind {
+                    return Some(node);
+                }
+                // If not exact match, try parent nodes
+                let mut current = Some(node);
+                while let Some(node) = current {
+                    if node.kind() == expected_kind {
+                        return Some(node);
+                    }
+                    current = node.parent();
+                }
+            }
+        }
+        None
+    }
+
+    /// Replace text by byte range using incremental parsing
+    /// Returns the fresh node at the same position after replacement
+    pub fn replace_text_by_byte_range(
+        &mut self,
+        start_byte: usize,
+        end_byte: usize,
+        new_text: &str,
+    ) -> Option<Node<'_>> {
+        // We need to get node info before doing the replacement since we need immutable access
+        let (start_pos, end_pos, node_kind) = {
+            if let Some(node) = self.get_named_node_at_byte_position(start_byte) {
+                (
+                    node.start_position(),
+                    node.end_position(),
+                    node.kind().to_string(),
+                )
+            } else {
+                return None;
+            }
+        };
+        let start_line = start_pos.row + 1;
+        let start_col = start_pos.column;
+        let success = self
+            .replace_text_incremental_by_pos(start_byte, end_byte, start_pos, end_pos, new_text);
+        if success {
+            // Try to find the same kind of node at the same position
+            self.get_node_from_position_with_kind(start_line, start_col, &node_kind)
+                .or_else(|| self.get_node_from_position(start_line, start_col))
+        } else {
+            None
+        }
+    }
 }
