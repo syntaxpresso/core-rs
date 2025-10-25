@@ -1,0 +1,194 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use tree_sitter::{Node, Parser, Point, Tree};
+
+#[allow(dead_code)]
+pub struct TSFile {
+    parser: Parser,
+    pub file: Option<PathBuf>,
+    pub tree: Option<Tree>,
+    pub source_code: String,
+    new_path: Option<PathBuf>,
+    modified: bool,
+}
+
+#[allow(dead_code)]
+impl TSFile {
+    pub fn from_source_code(source_code: &str) -> Self {
+        let mut parser = Parser::new();
+        let language = tree_sitter_java::LANGUAGE;
+        parser
+            .set_language(&language.into())
+            .expect("Error loading Java parser");
+        let tree = parser.parse(source_code, None);
+        TSFile {
+            parser,
+            file: None,
+            tree,
+            source_code: source_code.to_string(),
+            new_path: None,
+            modified: false,
+        }
+    }
+
+    pub fn from_file(path: &Path) -> std::io::Result<Self> {
+        let source_code = fs::read_to_string(path)?;
+        let mut parser = Parser::new();
+        let language = tree_sitter_java::LANGUAGE;
+        parser
+            .set_language(&language.into())
+            .expect("Error loading Java parser");
+        let tree = parser.parse(&source_code, None);
+        Ok(TSFile {
+            parser,
+            file: Some(path.to_path_buf()),
+            tree,
+            source_code,
+            new_path: None,
+            modified: false,
+        })
+    }
+
+    /// Internal: parse and set tree/source
+    pub fn set_data(&mut self, source_code: &str) {
+        self.tree = self.parser.parse(source_code, None);
+        self.source_code = source_code.to_string();
+    }
+
+    /// Update all source code
+    pub fn update_source_code(&mut self, new_source_code: &str) {
+        self.set_data(new_source_code);
+        self.modified = true;
+    }
+
+    /// Update a range in the source code
+    pub fn update_source_code_range(&mut self, start: usize, end: usize, new_text: &str) {
+        let mut content = self.source_code.clone();
+        content.replace_range(start..end, new_text);
+        self.set_data(&content);
+        self.modified = true;
+    }
+
+    /// Insert text at a position
+    pub fn insert_text(&mut self, position: usize, text: &str) {
+        let mut content = self.source_code.clone();
+        content.insert_str(position, text);
+        self.set_data(&content);
+        self.modified = true;
+    }
+
+    /// Save to original file path
+    pub fn save(&mut self) -> std::io::Result<()> {
+        let file = self.file.as_ref().ok_or_else(|| {
+            std::io::Error::other("File path is not set. Use save_as(path) instead.")
+        })?;
+        if let Some(new_path) = &self.new_path {
+            fs::rename(file, new_path)?;
+            self.file = Some(new_path.clone());
+            self.new_path = None;
+        }
+        fs::write(self.file.as_ref().unwrap(), &self.source_code)?;
+        self.modified = false;
+        Ok(())
+    }
+
+    /// Save to a new file path
+    pub fn save_as(&mut self, path: &Path) -> std::io::Result<()> {
+        fs::write(path, &self.source_code)?;
+        self.file = Some(path.to_path_buf());
+        self.modified = false;
+        Ok(())
+    }
+
+    /// Move file to new destination
+    pub fn move_file(&mut self, destination: &Path) {
+        self.new_path = Some(destination.to_path_buf());
+        self.modified = true;
+    }
+
+    /// Rename file in current directory
+    pub fn rename(&mut self, new_name: &str) -> std::io::Result<()> {
+        let file = self.file.as_ref().ok_or_else(|| {
+            std::io::Error::other("Cannot rename a file that has not been saved yet.")
+        })?;
+        let parent_dir = file
+            .parent()
+            .ok_or_else(|| std::io::Error::other("Unable to get parent directory"))?;
+        let target_path = parent_dir.join(new_name);
+        self.new_path = Some(target_path);
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Get node from line/column (1-based)
+    pub fn get_node_from_position(&self, line: usize, column: usize) -> Option<Node<'_>> {
+        if let Some(tree) = &self.tree {
+            let root = tree.root_node();
+            let point = Point::new(line - 1, column - 1);
+            root.named_descendant_for_point_range(point, point)
+        } else {
+            None
+        }
+    }
+
+    /// Get text from byte range
+    pub fn get_text_from_range(&self, start: usize, end: usize) -> Option<&str> {
+        self.source_code.get(start..end)
+    }
+
+    /// Get text from node
+    pub fn get_text_from_node(&self, node: &Node) -> Option<&str> {
+        self.get_text_from_range(node.start_byte(), node.end_byte())
+    }
+
+    /// Find parent node by type
+    pub fn find_parent_node_by_type<'a>(
+        &self,
+        start_node: &Node<'a>,
+        parent_type: &str,
+    ) -> Option<Node<'a>> {
+        let mut current = Some(*start_node);
+        while let Some(node) = current {
+            if node.kind() == parent_type {
+                return Some(node);
+            }
+            current = node.parent();
+        }
+        None
+    }
+
+    /// Find first child node by type
+    pub fn find_child_node_by_type<'a>(
+        &self,
+        start_node: &Node<'a>,
+        child_type: &str,
+    ) -> Option<Node<'a>> {
+        for i in 0..start_node.named_child_count() {
+            let child = start_node.named_child(i)?;
+            if child.kind() == child_type {
+                return Some(child);
+            }
+        }
+        None
+    }
+
+    /// Is node within another node
+    pub fn is_node_within(&self, node: &Node, container: &Node) -> bool {
+        node.start_byte() >= container.start_byte() && node.end_byte() <= container.end_byte()
+    }
+
+    /// Is file modified
+    pub fn is_modified(&self) -> bool {
+        self.modified
+    }
+
+    /// Has unsaved changes
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.modified
+    }
+
+    /// Get the file path (if set)
+    pub fn file_path(&self) -> Option<&PathBuf> {
+        self.file.as_ref()
+    }
+}
