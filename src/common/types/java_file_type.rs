@@ -7,16 +7,16 @@ pub enum JavaFileType {
     #[value(name = "class")]
     Class,
 
-    #[value(name = "class")]
+    #[value(name = "interface")]
     Interface,
 
-    #[value(name = "class")]
+    #[value(name = "enum")]
     Enum,
 
-    #[value(name = "class")]
+    #[value(name = "record")]
     Record,
 
-    #[value(name = "class")]
+    #[value(name = "annotation")]
     Annotation,
 }
 
@@ -25,40 +25,40 @@ impl JavaFileType {
     ///
     /// # Arguments
     /// * `package_name` - The Java package name (e.g., "com.example.entity")
-    /// * `class_name` - The class/interface/enum name
+    /// * `type_name` - The class/interface/enum name
     ///
     /// # Returns
     /// Generated Java source code as a String
-    pub fn get_source_content(&self, package_name: &str, class_name: &str) -> String {
+    pub fn get_source_content(&self, package_name: &str, type_name: &str) -> String {
         match self {
             JavaFileType::Class => {
                 format!(
                     "package {};\n\npublic class {} {{}}",
-                    package_name, class_name
+                    package_name, type_name
                 )
             }
             JavaFileType::Interface => {
                 format!(
                     "package {};\n\npublic interface {} {{}}",
-                    package_name, class_name
+                    package_name, type_name
                 )
             }
             JavaFileType::Enum => {
                 format!(
                     "package {};\n\npublic enum {} {{}}",
-                    package_name, class_name
+                    package_name, type_name
                 )
             }
             JavaFileType::Record => {
                 format!(
                     "package {};\n\npublic record {}() {{}}",
-                    package_name, class_name
+                    package_name, type_name
                 )
             }
             JavaFileType::Annotation => {
                 format!(
                     "package {};\n\npublic @interface {} {{}}",
-                    package_name, class_name
+                    package_name, type_name
                 )
             }
         }
@@ -68,13 +68,13 @@ impl JavaFileType {
     ///
     /// # Arguments
     /// * `package_name` - The Java package name
-    /// * `class_name` - The class/interface/enum name
+    /// * `type_name` - The class/interface/enum name
     ///
     /// # Returns
     /// Generated Java source code as a String
-    pub fn get_source_content_with_types(&self, package_name: &str, class_name: &str) -> String {
+    pub fn get_source_content_with_types(&self, package_name: &str, type_name: &str) -> String {
         // For now, delegate to the simpler version
         // This can be extended later if specific templates need the additional parameters
-        self.get_source_content(package_name, class_name)
+        self.get_source_content(package_name, type_name)
     }
 }
