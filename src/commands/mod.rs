@@ -1,4 +1,5 @@
 pub mod create_java_file_command;
+pub mod create_jpa_entity_command;
 pub mod get_all_files_command;
 pub mod services;
 mod validators;
@@ -40,6 +41,16 @@ pub enum Commands {
         #[arg(long, default_value = "main")]
         source_directory: JavaSourceDirectoryType,
     },
+    CreateJPAEntity {
+        #[arg(long, value_parser = validate_directory, required = true)]
+        cwd: PathBuf,
+
+        #[arg(long, value_parser = validate_package_name, required = true)]
+        package_name: String,
+
+        #[arg(long, value_parser = validate_java_class_name, required = true)]
+        file_name: String,
+    },
 }
 
 impl Commands {
@@ -63,6 +74,15 @@ impl Commands {
                     file_type,
                     source_directory,
                 );
+                response.to_json_pretty().map_err(|e| e.into())
+            }
+            Commands::CreateJPAEntity {
+                cwd,
+                package_name,
+                file_name,
+            } => {
+                let response =
+                    create_jpa_entity_command::execute(cwd.as_path(), package_name, file_name);
                 response.to_json_pretty().map_err(|e| e.into())
             }
         }

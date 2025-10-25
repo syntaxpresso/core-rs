@@ -1,0 +1,15 @@
+use std::path::Path;
+
+use crate::{
+    commands::services::create_jpa_entity_service::run,
+    responses::{file_response::FileResponse, response::Response},
+};
+
+pub fn execute(cwd: &Path, package_name: &str, file_name: &str) -> Response<FileResponse> {
+    let cwd_string = cwd.display().to_string();
+    let cmd_name = String::from("create-java-file");
+    match run(cwd, package_name, file_name) {
+        Ok(response) => Response::success(cmd_name, cwd_string, response),
+        Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
+    }
+}
