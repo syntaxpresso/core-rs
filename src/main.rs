@@ -1,11 +1,11 @@
 mod commands;
 mod common;
 mod responses;
-mod types;
 
 use clap::Parser;
 use commands::Commands;
-use types::ErrorResponse;
+
+use crate::responses::error_response::ErrorResponse;
 
 #[derive(Parser)]
 #[command(name = "core-rs")]
