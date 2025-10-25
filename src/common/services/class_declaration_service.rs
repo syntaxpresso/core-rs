@@ -4,7 +4,7 @@ use crate::common::ts_file::TSFile;
 use std::collections::HashMap;
 use tree_sitter::Node;
 
-pub fn get_first_public_class_node<'a>(ts_file: &'a TSFile) -> Option<Node<'a>> {
+fn get_first_public_class_node<'a>(ts_file: &'a TSFile) -> Option<Node<'a>> {
     ts_file.tree.as_ref()?;
     let query_string = r#"
         (class_declaration
