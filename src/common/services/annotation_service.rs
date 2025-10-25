@@ -281,3 +281,50 @@ pub fn add_annotation<'a>(
     };
     ts_file.replace_text_by_node(&declaration_node, &new_content)
 }
+
+pub fn add_annotation_argument<'a>(
+    ts_file: &'a mut TSFile,
+    annotation_node: Node<'a>,
+    key: &str,
+    value: &str,
+) -> Option<Node<'a>> {
+    if ts_file.tree.is_none() || key.trim().is_empty() || value.trim().is_empty() {
+        return None;
+    }
+    let node_kind = annotation_node.kind();
+    if !matches!(node_kind, "annotation" | "marker_annotation") {
+        return None;
+    }
+    let current_text = ts_file.get_text_from_node(&annotation_node)?;
+    let argument_pair = format!("{} = {}", key, value);
+    let new_content = if node_kind == "marker_annotation" {
+        // Convert marker annotation to annotation with arguments
+        // @Test -> @Test(key = value)
+        let name_node = get_annotation_name_node(ts_file, annotation_node)?;
+        let name_end_pos = name_node.end_byte() - annotation_node.start_byte();
+        let before = &current_text[..name_end_pos];
+        let after = &current_text[name_end_pos..];
+        format!("{}({}){}", before, argument_pair, after)
+    } else {
+        // Add argument to existing annotation
+        let existing_arguments = get_annotation_argument_pair_nodes(ts_file, annotation_node);
+        if existing_arguments.is_empty() {
+            // No existing arguments, add first one
+            // @Column -> @Column(key = value)
+            let name_node = get_annotation_name_node(ts_file, annotation_node)?;
+            let name_end_pos = name_node.end_byte() - annotation_node.start_byte();
+            let before = &current_text[..name_end_pos];
+            let after = &current_text[name_end_pos..];
+            format!("{}({}){}", before, argument_pair, after)
+        } else {
+            // Add argument to existing arguments
+            // @Column(name = "test") -> @Column(name = "test", key = value)
+            let last_argument = existing_arguments.last()?;
+            let insert_pos = last_argument.end_byte() - annotation_node.start_byte();
+            let before = &current_text[..insert_pos];
+            let after = &current_text[insert_pos..];
+            format!("{}, {}{}", before, argument_pair, after)
+        }
+    };
+    ts_file.replace_text_by_node(&annotation_node, &new_content)
+}
