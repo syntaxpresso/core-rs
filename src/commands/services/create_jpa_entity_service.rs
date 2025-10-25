@@ -2,12 +2,34 @@ use std::path::Path;
 
 use crate::commands::services::create_java_file_service;
 use crate::common::services::annotation_service;
+use crate::common::services::import_declaration_service;
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_types::AnnotationInsertionPosition;
+use crate::common::types::import_types::ImportInsertionPosition;
 use crate::common::types::java_file_type::JavaFileType;
 use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
 use crate::common::utils::case_util;
 use crate::responses::file_response::FileResponse;
+
+fn add_jpa_imports(ts_file: &mut TSFile) -> Result<(), String> {
+    let entity_import_result = import_declaration_service::add_import(
+        ts_file,
+        &ImportInsertionPosition::AfterLastImport,
+        "import jakarta.persistence.Entity;",
+    );
+    if entity_import_result.is_none() {
+        return Err("Failed to add import for jakarta.persistence.Entity".to_string());
+    }
+    let table_import_result = import_declaration_service::add_import(
+        ts_file,
+        &ImportInsertionPosition::AfterLastImport,
+        "import jakarta.persistence.Table;",
+    );
+    if table_import_result.is_none() {
+        return Err("Failed to add import for jakarta.persistence.Table".to_string());
+    }
+    Ok(())
+}
 
 fn build_file_response(ts_file: &TSFile, package_name: &str) -> Result<FileResponse, String> {
     let file_type_str = ts_file
@@ -107,18 +129,20 @@ pub fn run(cwd: &Path, package_name: &str, file_name: &str) -> Result<FileRespon
         create_java_file_and_get_response(cwd, package_name, &normalized_class_name)?;
     // Step 2: Load the file as a TSFile
     let mut ts_file = load_ts_file(&file_response.file_path)?;
-    // Step 3: Get the public class node byte position
+    // Step 3: Add required imports for JPA annotations
+    add_jpa_imports(&mut ts_file)?;
+    // Step 4: Get the public class node byte position after imports are added
     let class_byte_position = get_class_byte_position(&ts_file)?;
-    // Step 4: Add @Entity annotation above the class declaration
+    // Step 5: Add @Entity annotation above the class declaration
     add_entity_annotation(&mut ts_file, class_byte_position)?;
-    // Step 5: Get the updated class node position after annotation insertion
+    // Step 6: Get the updated class node position after annotation insertion
     let updated_class_position = get_class_byte_position(&ts_file)?;
-    // Step 6: Add @Table annotation above the class declaration
+    // Step 7: Add @Table annotation above the class declaration
     add_table_annotation(&mut ts_file, updated_class_position)?;
-    // Step 7: Add table name argument with snake_case conversion
+    // Step 8: Add table name argument with snake_case conversion
     add_table_name_argument(&mut ts_file, &normalized_class_name)?;
-    // Step 8: Save the updated TSFile to disk
+    // Step 9: Save the updated TSFile to disk
     save_ts_file(&mut ts_file, &file_response.file_path)?;
-    // Step 9: Build and return the final file response
+    // Step 10: Build and return the final file response
     build_file_response(&ts_file, package_name)
 }
