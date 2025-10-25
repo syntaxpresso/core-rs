@@ -5,7 +5,7 @@ use crate::{
         services::package_declaration_service::{get_package_declaration_node, get_package_name},
         utils::path_util::parse_all_files,
     },
-    responses::get_all_files_response::FileResponse,
+    responses::file_response::FileResponse,
 };
 
 pub fn run(cwd: &Path) -> Result<Vec<FileResponse>, String> {
