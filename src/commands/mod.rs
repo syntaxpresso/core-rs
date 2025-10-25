@@ -19,7 +19,10 @@ pub enum Commands {
 impl Commands {
     pub fn execute(&self) -> Result<String, Box<dyn std::error::Error>> {
         match self {
-            Commands::GetAllFiles { cwd } => get_all_files_command::execute(cwd.clone()),
+            Commands::GetAllFiles { cwd } => {
+                let response = get_all_files_command::execute(cwd.clone());
+                response.to_json_pretty().map_err(|e| e.into())
+            }
         }
     }
 }

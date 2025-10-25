@@ -11,8 +11,6 @@ pub struct FileResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetAllFilesCommandResponse {
-    pub command: String,
-    pub cwd: String,
     pub files: Vec<FileResponse>,
     pub files_count: usize,
 }
