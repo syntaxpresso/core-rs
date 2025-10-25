@@ -6,8 +6,7 @@ use crate::{
 };
 
 pub fn execute(cwd: PathBuf) -> Result<String, Box<dyn std::error::Error>> {
-    let ext = "java";
-    let files = run(&cwd, ext);
+    let files = run(&cwd);
     let files_size = files.len();
     let response = GetAllFilesCommandResponse {
         command: "get-all-files".to_string(),

@@ -4,7 +4,8 @@ use walkdir::WalkDir;
 
 use crate::common::ts_file::TSFile;
 
-pub fn parse_all_files_by_ext(cwd: &Path, extension: &str) -> Vec<TSFile> {
+pub fn parse_all_files(cwd: &Path) -> Vec<TSFile> {
+    let extension = "java";
     let mut files = Vec::new();
     for entry in WalkDir::new(cwd).into_iter().flatten() {
         let path = entry.path();

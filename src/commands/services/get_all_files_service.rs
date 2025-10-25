@@ -1,16 +1,16 @@
 use std::path::Path;
 
 use crate::{
-    common::services::package_declaration_service::{
-        get_package_declaration_node, get_package_name,
+    common::{
+        services::package_declaration_service::{get_package_declaration_node, get_package_name},
+        utils::path_util::parse_all_files,
     },
-    common::utils::path_util::parse_all_files_by_ext,
     responses::get_all_files_response::FileResponse,
 };
 
-pub fn run(cwd: &Path, extension: &str) -> Vec<FileResponse> {
+pub fn run(cwd: &Path) -> Vec<FileResponse> {
     let mut files = Vec::new();
-    let ts_files = parse_all_files_by_ext(cwd, extension);
+    let ts_files = parse_all_files(cwd);
     for ts_file in ts_files {
         let file_type = ts_file
             .get_file_name_without_ext()
