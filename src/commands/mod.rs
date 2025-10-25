@@ -1,14 +1,17 @@
 pub mod get_all_files_command;
 pub mod services;
+mod validators;
 
 use std::path::PathBuf;
 
 use clap::Subcommand;
 
+use crate::commands::validators::directory_validator::validate_directory;
+
 #[derive(Subcommand)]
 pub enum Commands {
     GetAllFiles {
-        #[arg(long)]
+        #[arg(long, value_parser = validate_directory)]
         cwd: PathBuf,
     },
 }
