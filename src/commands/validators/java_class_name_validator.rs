@@ -2,12 +2,15 @@ pub fn validate_java_class_name(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err("Class name cannot be empty".to_string());
     }
-    let first_char = s.chars().next().unwrap();
-    if !first_char.is_uppercase() {
-        return Err("Class name must start with an uppercase letter (PascalCase)".to_string());
-    }
-    if !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        return Err("Class name can only contain letters, numbers, and underscores".to_string());
+    // Allow various case formats (snake_case, camelCase, PascalCase, kebab-case, etc.)
+    // We'll convert them internally to PascalCase for Java conventions
+    if !s
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(
+            "Class name can only contain letters, numbers, underscores, and hyphens".to_string(),
+        );
     }
     let reserved_words = [
         "abstract",

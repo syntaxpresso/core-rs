@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::common::utils::case_util;
 use clap::ValueEnum;
 
 #[derive(Debug, Clone, PartialEq, ValueEnum)]
@@ -30,35 +31,37 @@ impl JavaFileType {
     /// # Returns
     /// Generated Java source code as a String
     pub fn get_source_content(&self, package_name: &str, type_name: &str) -> String {
+        // Ensure type name is in PascalCase for Java conventions
+        let normalized_type_name = case_util::to_pascal_case(type_name);
         match self {
             JavaFileType::Class => {
                 format!(
                     "package {};\n\npublic class {} {{}}",
-                    package_name, type_name
+                    package_name, normalized_type_name
                 )
             }
             JavaFileType::Interface => {
                 format!(
                     "package {};\n\npublic interface {} {{}}",
-                    package_name, type_name
+                    package_name, normalized_type_name
                 )
             }
             JavaFileType::Enum => {
                 format!(
                     "package {};\n\npublic enum {} {{}}",
-                    package_name, type_name
+                    package_name, normalized_type_name
                 )
             }
             JavaFileType::Record => {
                 format!(
                     "package {};\n\npublic record {}() {{}}",
-                    package_name, type_name
+                    package_name, normalized_type_name
                 )
             }
             JavaFileType::Annotation => {
                 format!(
                     "package {};\n\npublic @interface {} {{}}",
-                    package_name, type_name
+                    package_name, normalized_type_name
                 )
             }
         }
