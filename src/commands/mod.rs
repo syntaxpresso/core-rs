@@ -11,10 +11,11 @@ use crate::{
     commands::validators::{
         directory_validator::validate_directory,
         java_class_name_validator::validate_java_class_name,
-        java_identifier_validator::validate_java_identifier,
         package_name_validator::validate_package_name,
     },
-    common::types::java_file_type::JavaFileType,
+    common::types::{
+        java_file_type::JavaFileType, java_source_directory_type::JavaSourceDirectoryType,
+    },
 };
 
 #[derive(Subcommand)]
@@ -33,8 +34,11 @@ pub enum Commands {
         #[arg(long, value_parser = validate_java_class_name, required = true)]
         file_name: String,
 
-        #[arg(long, value_parser = validate_java_identifier, required = true)]
+        #[arg(long, required = true)]
         file_type: JavaFileType,
+
+        #[arg(long, default_value = "main")]
+        source_directory: JavaSourceDirectoryType,
     },
 }
 
@@ -42,7 +46,7 @@ impl Commands {
     pub fn execute(&self) -> Result<String, Box<dyn std::error::Error>> {
         match self {
             Commands::GetAllFiles { cwd } => {
-                let response = get_all_files_command::execute(cwd.clone());
+                let response = get_all_files_command::execute(cwd.as_path());
                 response.to_json_pretty().map_err(|e| e.into())
             }
             Commands::CreateJavaFile {
@@ -50,8 +54,15 @@ impl Commands {
                 package_name,
                 file_name,
                 file_type,
+                source_directory,
             } => {
-                let response = get_all_files_command::execute(cwd.clone());
+                let response = create_java_file_command::execute(
+                    cwd.as_path(),
+                    package_name,
+                    file_name,
+                    file_type,
+                    source_directory,
+                );
                 response.to_json_pretty().map_err(|e| e.into())
             }
         }

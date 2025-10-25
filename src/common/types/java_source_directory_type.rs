@@ -1,7 +1,14 @@
-#[derive(Debug, Clone, PartialEq)]
+use std::path::{Path, PathBuf};
+
+use clap::ValueEnum;
+
+#[derive(Debug, Clone, PartialEq, ValueEnum)]
 pub enum JavaSourceDirectoryType {
+    #[value(name = "main")]
     Main,
+    #[value(name = "test")]
     Test,
+    #[value(name = "all")]
     All,
 }
 
@@ -16,18 +23,12 @@ impl JavaSourceDirectoryType {
     }
 
     /// Get the Maven/Gradle standard directory structure path
-    pub fn get_full_path(&self, base_path: &str, package_name: &str) -> String {
+    pub fn get_full_path(&self, base_path: &Path, package_name: &str) -> PathBuf {
         let package_path = package_name.replace('.', "/");
         match self {
-            JavaSourceDirectoryType::Main => {
-                format!("{}/src/main/java/{}", base_path, package_path)
-            }
-            JavaSourceDirectoryType::Test => {
-                format!("{}/src/test/java/{}", base_path, package_path)
-            }
-            JavaSourceDirectoryType::All => {
-                format!("{}/src/{}", base_path, package_path)
-            }
+            JavaSourceDirectoryType::Main => base_path.join("src/main/java").join(&package_path),
+            JavaSourceDirectoryType::Test => base_path.join("src/test/java").join(&package_path),
+            JavaSourceDirectoryType::All => base_path.join("src").join(&package_path),
         }
     }
 }

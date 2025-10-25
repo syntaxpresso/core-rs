@@ -17,4 +17,3 @@ pub fn validate_package_name(s: &str) -> Result<String, String> {
     }
     Ok(s.to_string())
 }
-
