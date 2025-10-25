@@ -1,18 +1,21 @@
+#![allow(dead_code)]
+
 use std::fs;
 use std::path::{Path, PathBuf};
-use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
+use tree_sitter::{
+    InputEdit, Language, Node, Parser, Point, Query, QueryCursor, StreamingIterator, Tree,
+};
 
-#[allow(dead_code)]
 pub struct TSFile {
+    language: Language,
     parser: Parser,
+    new_path: Option<PathBuf>,
+    modified: bool,
     pub file: Option<PathBuf>,
     pub tree: Option<Tree>,
     pub source_code: String,
-    new_path: Option<PathBuf>,
-    modified: bool,
 }
 
-#[allow(dead_code)]
 impl TSFile {
     fn set_data(&mut self, source_code: &str) {
         self.tree = self.parser.parse(source_code, None);
@@ -128,6 +131,7 @@ impl TSFile {
             .expect("Error loading Java parser");
         let tree = parser.parse(source_code, None);
         TSFile {
+            language: language.into(),
             parser,
             file: None,
             tree,
@@ -146,6 +150,7 @@ impl TSFile {
             .expect("Error loading Java parser");
         let tree = parser.parse(&source_code, None);
         Ok(TSFile {
+            language: language.into(),
             parser,
             file: Some(path.to_path_buf()),
             tree,
@@ -254,6 +259,14 @@ impl TSFile {
         self.get_text_from_range(node.start_byte(), node.end_byte())
     }
 
+    pub fn get_file_name_without_ext(&self) -> Option<String> {
+        self.file
+            .as_ref()?
+            .file_stem()?
+            .to_str()
+            .map(|s| s.to_string())
+    }
+
     /// Is file modified
     pub fn is_modified(&self) -> bool {
         self.modified
@@ -267,5 +280,45 @@ impl TSFile {
     /// Get the file path (if set)
     pub fn file_path(&self) -> Option<&PathBuf> {
         self.file.as_ref()
+    }
+
+    /// Execute a tree-sitter query on the parsed tree
+    /// Returns a vector of nodes from all captures in all matches
+    pub fn query(&self, query_string: &str) -> Result<Vec<Node<'_>>, Box<dyn std::error::Error>> {
+        let tree = self.tree.as_ref().ok_or("No parsed tree available")?;
+        let query = Query::new(&self.language, query_string)?;
+        let mut cursor = QueryCursor::new();
+        let root_node = tree.root_node();
+        let mut nodes = Vec::new();
+        let mut query_matches = cursor.matches(&query, root_node, self.source_code.as_bytes());
+        while let Some(query_match) = query_matches.next() {
+            for capture in query_match.captures {
+                nodes.push(capture.node);
+            }
+        }
+        Ok(nodes)
+    }
+
+    /// Execute a query and get the first matching node with the given capture name
+    pub fn query_first_node(&self, query_string: &str, capture_name: &str) -> Option<Node<'_>> {
+        let tree = self.tree.as_ref()?;
+        let query = Query::new(&self.language, query_string).ok()?;
+        let mut cursor = QueryCursor::new();
+        let root_node = tree.root_node();
+        let mut matches = cursor.matches(&query, root_node, self.source_code.as_bytes());
+        while let Some(query_match) = matches.next() {
+            for capture in query_match.captures {
+                let capture_name_index = query
+                    .capture_names()
+                    .iter()
+                    .position(|name| *name == capture_name)?;
+
+                if capture.index == capture_name_index as u32 {
+                    return Some(capture.node);
+                }
+            }
+        }
+
+        None
     }
 }
