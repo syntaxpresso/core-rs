@@ -21,7 +21,11 @@ use tree_sitter::Node;
 pub fn get_package_declaration_node(ts_file: &TSFile) -> Option<Node<'_>> {
     ts_file.tree.as_ref()?;
     let query_string = "(package_declaration) @package";
-    ts_file.query_first_node(query_string, "package")
+    ts_file.query_builder(query_string)
+        .returning("package")
+        .first_node()
+        .ok()
+        .flatten()
 }
 
 /// Extracts the complete package name as a string from a package declaration.
@@ -50,7 +54,11 @@ pub fn get_package_name(ts_file: &TSFile, _package_node: &Node) -> Option<String
           (scoped_identifier) @name)
     "#;
     // Find the name part of the package declaration
-    if let Some(name_node) = ts_file.query_first_node(query_string, "name") {
+    if let Some(name_node) = ts_file.query_builder(query_string)
+        .returning("name")
+        .first_node()
+        .ok()
+        .flatten() {
         ts_file
             .get_text_from_node(&name_node)
             .map(|s| s.to_string())
@@ -60,7 +68,11 @@ pub fn get_package_name(ts_file: &TSFile, _package_node: &Node) -> Option<String
             (package_declaration 
               (identifier) @name)
         "#;
-        if let Some(name_node) = ts_file.query_first_node(simple_query, "name") {
+        if let Some(name_node) = ts_file.query_builder(simple_query)
+            .returning("name")
+            .first_node()
+            .ok()
+            .flatten() {
             ts_file
                 .get_text_from_node(&name_node)
                 .map(|s| s.to_string())
@@ -103,7 +115,11 @@ pub fn get_package_class_name_node<'a>(
           )
         )
     "#;
-    ts_file.query_first_node(query_string, "class_name")
+    ts_file.query_builder(query_string)
+        .returning("class_name")
+        .first_node()
+        .ok()
+        .flatten()
 }
 
 /// Extracts the scope part (everything except the rightmost component) from a package declaration.
@@ -138,7 +154,11 @@ pub fn get_package_class_scope_node<'a>(
           )
         )
     "#;
-    ts_file.query_first_node(query_string, "class_scope")
+    ts_file.query_builder(query_string)
+        .returning("class_scope")
+        .first_node()
+        .ok()
+        .flatten()
 }
 
 /// Extracts the complete scoped identifier node from a package declaration.
@@ -171,5 +191,9 @@ pub fn get_package_scope_node<'a>(
           (scoped_identifier) @package_scope
         )
     "#;
-    ts_file.query_first_node(query_string, "package_scope")
+    ts_file.query_builder(query_string)
+        .returning("package_scope")
+        .first_node()
+        .ok()
+        .flatten()
 }

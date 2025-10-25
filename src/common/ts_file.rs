@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::common::query::TSQueryBuilder;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tree_sitter::{
@@ -7,7 +8,7 @@ use tree_sitter::{
 };
 
 pub struct TSFile {
-    language: Language,
+    pub language: Language,
     parser: Parser,
     new_path: Option<PathBuf>,
     modified: bool,
@@ -282,6 +283,12 @@ impl TSFile {
         self.file.as_ref()
     }
 
+    /// Create a fluent query builder for advanced queries
+    /// This is the new fluent API entry point
+    pub fn query_builder(&self, query_string: &str) -> TSQueryBuilder<'_> {
+        TSQueryBuilder::new(self, query_string.to_string())
+    }
+
     /// Execute a tree-sitter query on the parsed tree
     /// Returns a vector of nodes from all captures in all matches
     pub fn query(&self, query_string: &str) -> Result<Vec<Node<'_>>, Box<dyn std::error::Error>> {
@@ -299,26 +306,5 @@ impl TSFile {
         Ok(nodes)
     }
 
-    /// Execute a query and get the first matching node with the given capture name
-    pub fn query_first_node(&self, query_string: &str, capture_name: &str) -> Option<Node<'_>> {
-        let tree = self.tree.as_ref()?;
-        let query = Query::new(&self.language, query_string).ok()?;
-        let mut cursor = QueryCursor::new();
-        let root_node = tree.root_node();
-        let mut matches = cursor.matches(&query, root_node, self.source_code.as_bytes());
-        while let Some(query_match) = matches.next() {
-            for capture in query_match.captures {
-                let capture_name_index = query
-                    .capture_names()
-                    .iter()
-                    .position(|name| *name == capture_name)?;
 
-                if capture.index == capture_name_index as u32 {
-                    return Some(capture.node);
-                }
-            }
-        }
-
-        None
-    }
 }
