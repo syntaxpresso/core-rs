@@ -1,7 +1,33 @@
 #![allow(dead_code)]
 
 use crate::common::ts_file::TSFile;
+use crate::common::types::annotation_types::AnnotationInsertionPosition;
 use tree_sitter::Node;
+
+#[derive(Debug, Clone)]
+struct AnnotationInsertionPoint {
+    position: AnnotationInsertionPosition,
+    insert_byte: usize,
+    break_line_before: bool,
+    break_line_after: bool,
+}
+
+impl Default for AnnotationInsertionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AnnotationInsertionPoint {
+    fn new() -> Self {
+        Self {
+            position: AnnotationInsertionPosition::BeforeFirstAnnotation,
+            insert_byte: 0,
+            break_line_before: false,
+            break_line_after: false,
+        }
+    }
+}
 
 pub fn get_all_annotation_nodes<'a>(ts_file: &'a TSFile, scope_node: Node<'a>) -> Vec<Node<'a>> {
     if ts_file.tree.is_none() {
@@ -183,4 +209,75 @@ pub fn find_annotation_value_node_by_key<'a>(
         .execute()
         .ok()?
         .first_node()
+}
+
+pub fn add_annotation<'a>(
+    ts_file: &'a mut TSFile,
+    declaration_node: Node<'a>,
+    insertion_position: &AnnotationInsertionPosition,
+    annotation_text: &str,
+) -> Option<Node<'a>> {
+    if ts_file.tree.is_none() || annotation_text.trim().is_empty() {
+        return None;
+    }
+    let node_kind = declaration_node.kind();
+    if !matches!(
+        node_kind,
+        "class_declaration" | "field_declaration" | "interface_declaration" | "method_declaration"
+    ) {
+        return None;
+    }
+    let all_annotations = get_all_annotation_nodes(ts_file, declaration_node);
+    let mut annotation_insertion_point = AnnotationInsertionPoint::new();
+    annotation_insertion_point.position = insertion_position.clone();
+    match insertion_position {
+        AnnotationInsertionPosition::BeforeFirstAnnotation => {
+            if !all_annotations.is_empty() {
+                annotation_insertion_point.break_line_after = true;
+                annotation_insertion_point.insert_byte = all_annotations[0].start_byte();
+            } else {
+                annotation_insertion_point.break_line_after = true;
+                annotation_insertion_point.insert_byte = declaration_node.start_byte();
+            }
+        }
+        AnnotationInsertionPosition::AboveScopeDeclaration => {
+            if all_annotations.is_empty() {
+                annotation_insertion_point.break_line_after = true;
+                annotation_insertion_point.insert_byte = declaration_node.start_byte();
+            } else {
+                annotation_insertion_point.break_line_before = true;
+                annotation_insertion_point.insert_byte = all_annotations.last()?.end_byte();
+            }
+        }
+    }
+    let current_text = ts_file.get_text_from_node(&declaration_node)?;
+    let new_content = match insertion_position {
+        AnnotationInsertionPosition::BeforeFirstAnnotation => {
+            if !all_annotations.is_empty() {
+                // Insert before first annotation
+                let first_annotation = &all_annotations[0];
+                let relative_pos = first_annotation.start_byte() - declaration_node.start_byte();
+                let before = &current_text[..relative_pos];
+                let after = &current_text[relative_pos..];
+                format!("{}{}\n{}", before, annotation_text, after)
+            } else {
+                // No annotations exist, insert at beginning
+                format!("{}\n{}", annotation_text, current_text)
+            }
+        }
+        AnnotationInsertionPosition::AboveScopeDeclaration => {
+            if all_annotations.is_empty() {
+                // No annotations exist, insert at beginning
+                format!("{}\n{}", annotation_text, current_text)
+            } else {
+                // Insert after last annotation
+                let last_annotation = all_annotations.last()?;
+                let relative_pos = last_annotation.end_byte() - declaration_node.start_byte();
+                let before = &current_text[..relative_pos];
+                let after = &current_text[relative_pos..];
+                format!("{}\n{}{}", before, annotation_text, after)
+            }
+        }
+    };
+    ts_file.replace_text_by_node(&declaration_node, &new_content)
 }
