@@ -7,7 +7,7 @@ use crate::{
 
 pub fn execute(cwd: &Path, package_name: &str, file_name: &str) -> Response<FileResponse> {
     let cwd_string = cwd.display().to_string();
-    let cmd_name = String::from("create-java-file");
+    let cmd_name = String::from("create-jpa-entity");
     match run(cwd, package_name, file_name) {
         Ok(response) => Response::success(cmd_name, cwd_string, response),
         Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
