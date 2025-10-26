@@ -2,8 +2,19 @@
 
 use crate::common::services::package_declaration_service::get_package_declaration_node;
 use crate::common::ts_file::TSFile;
-use crate::common::types::import_types::ImportInsertionPosition;
+use crate::common::types::import_types::{ImportInsertionPoint, ImportInsertionPosition};
 use tree_sitter::Node;
+
+impl ImportInsertionPoint {
+    fn new() -> Self {
+        Self {
+            position: ImportInsertionPosition::AfterLastImport,
+            insert_byte: 0,
+            break_line_before: false,
+            break_line_after: false,
+        }
+    }
+}
 
 pub fn get_all_import_declaration_nodes<'a>(ts_file: &'a TSFile) -> Vec<Node<'a>> {
     if ts_file.tree.is_none() {
@@ -237,25 +248,6 @@ pub fn find_import_declaration_node<'a>(
         }
     }
     None
-}
-
-#[derive(Debug, Clone)]
-struct ImportInsertionPoint {
-    position: ImportInsertionPosition,
-    insert_byte: usize,
-    break_line_before: bool,
-    break_line_after: bool,
-}
-
-impl ImportInsertionPoint {
-    fn new() -> Self {
-        Self {
-            position: ImportInsertionPosition::AfterLastImport,
-            insert_byte: 0,
-            break_line_before: false,
-            break_line_after: false,
-        }
-    }
 }
 
 /// Adds an import declaration to a Java file at the specified insertion position.
