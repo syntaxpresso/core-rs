@@ -86,7 +86,8 @@ pub fn get_class_declaration_name_node<'a>(
         return None;
     }
     let query_string = r#"
-        name: (identifier) @className
+        (class_declaration
+          name: (identifier) @className) 
     "#;
     ts_file
         .query_builder(query_string)

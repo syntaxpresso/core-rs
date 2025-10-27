@@ -1,16 +1,10 @@
 #![allow(dead_code)]
 
 use crate::common::ts_file::TSFile;
-use crate::common::types::annotation_types::AnnotationInsertionPosition;
+use crate::common::types::annotation_types::{
+    AnnotationInsertionPoint, AnnotationInsertionPosition,
+};
 use tree_sitter::Node;
-
-#[derive(Debug, Clone)]
-struct AnnotationInsertionPoint {
-    position: AnnotationInsertionPosition,
-    insert_byte: usize,
-    break_line_before: bool,
-    break_line_after: bool,
-}
 
 impl Default for AnnotationInsertionPoint {
     fn default() -> Self {
