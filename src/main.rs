@@ -1,6 +1,6 @@
-mod commands;
-mod common;
-mod responses;
+pub mod commands;
+pub mod common;
+pub mod responses;
 
 use clap::Parser;
 use commands::Commands;
