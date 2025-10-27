@@ -59,7 +59,7 @@ pub fn create_jpa_repository_response(
     }
 }
 
-fn file_response_from_ts_file(ts_file: &TSFile) -> Result<FileResponse, String> {
+fn create_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
     let file_path = ts_file
         .file_path()
         .and_then(|p| p.to_str().map(|s| s.to_string()))
@@ -133,16 +133,17 @@ fn extend_jpa_repository(
     if package_declaration_node.is_none() {
         return;
     }
-    let import_insert_position = ImportInsertionPosition::AfterPackageDeclaration;
+    let import_insert_position_one = ImportInsertionPosition::AfterPackageDeclaration;
+    let import_insert_position_two = ImportInsertionPosition::AfterLastImport;
     add_import(
         jpa_repository_ts_file,
-        &import_insert_position,
+        &import_insert_position_one,
         id_field_package_name,
         id_field_type,
     );
     add_import(
         jpa_repository_ts_file,
-        &import_insert_position,
+        &import_insert_position_two,
         "org.springframework.data.jpa.repository",
         "JpaRepository",
     );
@@ -186,7 +187,7 @@ pub fn run(
             )?;
             match jpa_repository_ts_file.save() {
                 Ok(_) => {
-                    let file_response = file_response_from_ts_file(&jpa_repository_ts_file)?;
+                    let file_response = create_file_response(&jpa_repository_ts_file)?;
                     let response = create_jpa_repository_response(true, None, Some(file_response));
                     Ok(response)
                 }
@@ -199,14 +200,22 @@ pub fn run(
         }
     } else {
         let jpa_entity_info = get_jpa_entity_info(None, b64_superclass_source)?;
-        let superclass_type = jpa_entity_info.superclass_type;
-        if superclass_type.is_none()
-            && (jpa_entity_info.id_field_type.is_none()
-                || jpa_entity_info.id_field_package_name.is_none())
-        {
+        if jpa_entity_info.id_field_type.is_none() || jpa_entity_info.id_field_package_name.is_none() {
             return Err("Unable to find ID field for this JPA Entity".to_string());
         }
-        let response = create_jpa_repository_response(false, superclass_type, None);
-        Ok(response)
+        let mut jpa_repository_ts_file = create_and_extend_jpa_repository(
+            cwd,
+            &entity_ts_file,
+            entity_type.as_ref(),
+            &jpa_entity_info,
+        )?;
+        match jpa_repository_ts_file.save() {
+            Ok(_) => {
+                let file_response = create_file_response(&jpa_repository_ts_file)?;
+                let response = create_jpa_repository_response(true, None, Some(file_response));
+                Ok(response)
+            }
+            Err(_) => Err("Unable to create response".to_string()),
+        }
     }
 }
