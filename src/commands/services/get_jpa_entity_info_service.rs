@@ -36,8 +36,13 @@ fn get_public_class_node<'a>(ts_file: &'a TSFile) -> Result<Node<'a>, String> {
     }
 }
 
-fn check_is_jpa_entity(ts_file: &TSFile, class_node: &Node) -> bool {
-    annotation_service::find_annotation_node_by_name(ts_file, *class_node, "Entity").is_some()
+fn check_is_jpa_entity(ts_file: &TSFile, class_node: &Node) -> Result<bool, String> {
+    let entity_annotation_node =
+        annotation_service::find_annotation_node_by_name(ts_file, *class_node, "Entity");
+    match entity_annotation_node {
+        Some(_) => Ok(true),
+        None => Err("Unable to check if is JPA Entity".to_string()),
+    }
 }
 
 fn extract_entity_type(ts_file: &TSFile, class_declaration_node: &Node) -> Result<String, String> {
@@ -245,7 +250,7 @@ pub fn run(
     // Step 2: Get public class node
     let public_class_node = get_public_class_node(&ts_file)?;
     // Step 3: Check if class is JPA entity
-    let is_jpa_entity = check_is_jpa_entity(&ts_file, &public_class_node);
+    let is_jpa_entity = check_is_jpa_entity(&ts_file, &public_class_node)?;
     // Step 4: Extract class name
     let entity_type = extract_entity_type(&ts_file, &public_class_node)?;
     // Step 5: Extract package name
