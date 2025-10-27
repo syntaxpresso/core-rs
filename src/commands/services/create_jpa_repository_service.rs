@@ -7,7 +7,7 @@ use crate::common::services::interface_declaration_service::{
     get_interface_name_node, get_public_interface_node,
 };
 use crate::common::services::package_declaration_service::{
-    get_package_class_scope_node, get_package_declaration_node,
+    get_package_declaration_node, get_package_scope_node,
 };
 use crate::common::ts_file::TSFile;
 use crate::common::types::import_types::ImportInsertionPosition;
@@ -23,7 +23,7 @@ fn create_repository_file(cwd: &Path, entity_ts_file: &TSFile) -> Result<FileRes
         return Err("Unable to get JPA Entity package declaration node".to_string());
     }
     let entity_package_scope_node =
-        get_package_class_scope_node(entity_ts_file, entity_package_declaration_node.unwrap());
+        get_package_scope_node(entity_ts_file, entity_package_declaration_node.unwrap());
     if entity_package_scope_node.is_none() {
         return Err("Unable to get JPA Entity package scope node".to_string());
     }
@@ -185,7 +185,7 @@ pub fn run(
                     let response = create_jpa_repository_response(true, None, Some(file_response));
                     Ok(response)
                 }
-                Err(_) => Err("Unable to create respoinse".to_string()),
+                Err(_) => Err("Unable to create response".to_string()),
             };
         }
     }
