@@ -3,7 +3,9 @@ use std::path::Path;
 use base64::prelude::*;
 use tree_sitter::Node;
 
-use crate::common::services::class_declaration_service::get_class_declaration_name_node;
+use crate::common::services::class_declaration_service::{
+    get_class_declaration_name_node, get_class_superclass_name_node,
+};
 use crate::common::services::package_declaration_service::{
     get_package_class_scope_node, get_package_declaration_node,
 };
@@ -225,6 +227,15 @@ fn create_ts_file(
     }
 }
 
+fn get_superclass_name(ts_file: &TSFile, class_declaration_node: &Node) -> Option<String> {
+    let superclass_name_node_option =
+        get_class_superclass_name_node(ts_file, *class_declaration_node);
+    match superclass_name_node_option {
+        Some(node) => ts_file.get_text_from_node(&node).map(|s| s.to_string()),
+        None => None,
+    }
+}
+
 pub fn run(
     entity_file_path: Option<&Path>,
     b64_source_code: Option<&str>,
@@ -245,6 +256,7 @@ pub fn run(
     let entity_path = ts_file
         .file_path()
         .map(|path| path.to_string_lossy().to_string());
+    let superclass_name = get_superclass_name(&ts_file, &public_class_node);
     Ok(GetJpaEntityInfoResponse {
         is_jpa_entity,
         entity_type,
@@ -252,5 +264,6 @@ pub fn run(
         entity_path,
         id_field_type,
         id_field_package_name,
+        superclass_type: superclass_name,
     })
 }

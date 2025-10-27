@@ -8,6 +8,7 @@ pub struct GetJpaEntityInfoResponse {
     pub is_jpa_entity: bool,
     pub entity_type: String,
     pub entity_package_name: String,
+    pub superclass_type: Option<String>,
     pub entity_path: Option<String>,
     pub id_field_type: Option<String>,
     pub id_field_package_name: Option<String>,
