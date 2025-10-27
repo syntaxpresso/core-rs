@@ -64,9 +64,7 @@ fn file_response_from_ts_file(ts_file: &TSFile) -> Result<FileResponse, String> 
         .file_path()
         .and_then(|p| p.to_str().map(|s| s.to_string()))
         .ok_or_else(|| "Unable to get file path from TSFile".to_string())?;
-    let file_type = ts_file
-        .get_file_name_without_ext()
-        .unwrap_or_default();
+    let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
     let package_declaration_node =
         crate::common::services::package_declaration_service::get_package_declaration_node(ts_file);
     let package_name = package_declaration_node
