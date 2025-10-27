@@ -212,11 +212,11 @@ fn get_package_for_type(type_name: &str) -> String {
 
 fn create_ts_file(
     entity_file_path: Option<&Path>,
-    b64_superclass_source: Option<&str>,
+    b64_source_code: Option<&str>,
 ) -> Result<TSFile, String> {
     if let Some(path) = entity_file_path {
         Ok(TSFile::from_file(path).map_err(|e| e.to_string())?)
-    } else if let Some(b64) = b64_superclass_source {
+    } else if let Some(b64) = b64_source_code {
         let bytes = decode_base64_to_bytes(b64)?;
         let source = bytes_to_string(&bytes)?;
         Ok(TSFile::from_source_code(&source))
