@@ -15,7 +15,8 @@ fn add_jpa_imports(ts_file: &mut TSFile) -> Result<(), String> {
     let entity_import_result = import_declaration_service::add_import(
         ts_file,
         &ImportInsertionPosition::AfterLastImport,
-        "import jakarta.persistence.Entity;",
+        "jakarta.persistence",
+        "Entity",
     );
     if entity_import_result.is_none() {
         return Err("Failed to add import for jakarta.persistence.Entity".to_string());
@@ -23,7 +24,8 @@ fn add_jpa_imports(ts_file: &mut TSFile) -> Result<(), String> {
     let table_import_result = import_declaration_service::add_import(
         ts_file,
         &ImportInsertionPosition::AfterLastImport,
-        "import jakarta.persistence.Table;",
+        "jakarta.persistence",
+        "Table",
     );
     if table_import_result.is_none() {
         return Err("Failed to add import for jakarta.persistence.Table".to_string());

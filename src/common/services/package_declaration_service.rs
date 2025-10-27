@@ -21,65 +21,12 @@ use tree_sitter::Node;
 pub fn get_package_declaration_node(ts_file: &TSFile) -> Option<Node<'_>> {
     ts_file.tree.as_ref()?;
     let query_string = "(package_declaration) @package";
-    ts_file.query_builder(query_string)
+    ts_file
+        .query_builder(query_string)
         .returning("package")
         .first_node()
         .ok()
         .flatten()
-}
-
-/// Extracts the complete package name as a string from a package declaration.
-///
-/// # Arguments
-/// * `ts_file` - Reference to the TSFile containing the parsed Java code
-/// * `_package_node` - The package declaration node (currently unused, kept for API consistency)
-///
-/// # Returns
-/// * `Some(String)` - The full package name
-/// * `None` - If no package name could be extracted
-///
-/// # Example
-/// ```rust
-/// // For Java file containing: package com.example.myapp;
-/// let package_name = get_package_name(&ts_file, &package_node);
-/// // Returns: Some("com.example.myapp".to_string())
-/// ```
-///
-/// # Expected Result
-/// Returns the complete package identifier as text (e.g., "com.example.myapp")
-pub fn get_package_name(ts_file: &TSFile, _package_node: &Node) -> Option<String> {
-    // Simpler approach: query for any identifier or scoped_identifier in package_declaration
-    let query_string = r#"
-        (package_declaration 
-          (scoped_identifier) @name)
-    "#;
-    // Find the name part of the package declaration
-    if let Some(name_node) = ts_file.query_builder(query_string)
-        .returning("name")
-        .first_node()
-        .ok()
-        .flatten() {
-        ts_file
-            .get_text_from_node(&name_node)
-            .map(|s| s.to_string())
-    } else {
-        // Fallback: try simple identifier for single-part package names
-        let simple_query = r#"
-            (package_declaration 
-              (identifier) @name)
-        "#;
-        if let Some(name_node) = ts_file.query_builder(simple_query)
-            .returning("name")
-            .first_node()
-            .ok()
-            .flatten() {
-            ts_file
-                .get_text_from_node(&name_node)
-                .map(|s| s.to_string())
-        } else {
-            None
-        }
-    }
 }
 
 /// Extracts the rightmost part (class name) from a package declaration.
@@ -106,7 +53,7 @@ pub fn get_package_name(ts_file: &TSFile, _package_node: &Node) -> Option<String
 /// Returns the rightmost identifier from the package declaration (e.g., "myapp" from "com.example.myapp")
 pub fn get_package_class_name_node<'a>(
     ts_file: &'a TSFile,
-    _package_declaration_node: &Node,
+    package_declaration_node: Node<'a>,
 ) -> Option<Node<'a>> {
     let query_string = r#"
         (package_declaration
@@ -115,7 +62,9 @@ pub fn get_package_class_name_node<'a>(
           )
         )
     "#;
-    ts_file.query_builder(query_string)
+    ts_file
+        .query_builder(query_string)
+        .within(package_declaration_node)
         .returning("class_name")
         .first_node()
         .ok()
@@ -145,7 +94,7 @@ pub fn get_package_class_name_node<'a>(
 /// Returns everything except the rightmost identifier (e.g., "com.example" from "com.example.myapp")
 pub fn get_package_class_scope_node<'a>(
     ts_file: &'a TSFile,
-    _package_declaration_node: &Node,
+    package_declaration_node: Node<'a>,
 ) -> Option<Node<'a>> {
     let query_string = r#"
         (package_declaration
@@ -154,7 +103,9 @@ pub fn get_package_class_scope_node<'a>(
           )
         )
     "#;
-    ts_file.query_builder(query_string)
+    ts_file
+        .query_builder(query_string)
+        .within(package_declaration_node)
         .returning("class_scope")
         .first_node()
         .ok()
@@ -184,14 +135,16 @@ pub fn get_package_class_scope_node<'a>(
 /// Returns the complete dotted package identifier (e.g., "com.example.myapp")
 pub fn get_package_scope_node<'a>(
     ts_file: &'a TSFile,
-    _package_declaration_node: &Node,
+    package_declaration_node: Node<'a>,
 ) -> Option<Node<'a>> {
     let query_string = r#"
         (package_declaration
           (scoped_identifier) @package_scope
         )
     "#;
-    ts_file.query_builder(query_string)
+    ts_file
+        .query_builder(query_string)
+        .within(package_declaration_node)
         .returning("package_scope")
         .first_node()
         .ok()

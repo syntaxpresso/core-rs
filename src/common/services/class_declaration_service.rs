@@ -78,7 +78,30 @@ pub fn get_all_class_declaration_nodes<'a>(ts_file: &'a TSFile) -> Vec<HashMap<S
     }
 }
 
-pub fn get_class_superclass_name_node<'a>(ts_file: &'a TSFile) -> Option<Node<'a>> {
+pub fn get_class_declaration_name_node<'a>(
+    ts_file: &'a TSFile,
+    class_node: Node<'a>,
+) -> Option<Node<'a>> {
+    if class_node.kind() != "class_declaration" {
+        return None;
+    }
+    let query_string = r#"
+        (class_declaration
+          name: (identifier) @className) 
+    "#;
+    ts_file
+        .query_builder(query_string)
+        .within(class_node)
+        .returning("className")
+        .execute()
+        .ok()?
+        .first_node()
+}
+
+pub fn get_class_superclass_name_node<'a>(
+    ts_file: &'a TSFile,
+    class_declaration_node: Node<'a>,
+) -> Option<Node<'a>> {
     ts_file.tree.as_ref()?;
     let query_string = r#"
         (class_declaration
@@ -90,6 +113,7 @@ pub fn get_class_superclass_name_node<'a>(ts_file: &'a TSFile) -> Option<Node<'a
     "#;
     ts_file
         .query_builder(query_string)
+        .within(class_declaration_node)
         .returning("superclassName")
         .execute()
         .ok()?

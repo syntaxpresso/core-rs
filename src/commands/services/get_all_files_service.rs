@@ -2,7 +2,9 @@ use std::path::Path;
 
 use crate::{
     common::{
-        services::package_declaration_service::{get_package_declaration_node, get_package_name},
+        services::package_declaration_service::{
+            get_package_declaration_node, get_package_scope_node,
+        },
         utils::path_util::parse_all_files,
     },
     responses::file_response::FileResponse,
@@ -20,7 +22,10 @@ pub fn run(cwd: &Path) -> Result<Vec<FileResponse>, String> {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| "Unknown path".to_string());
         let file_package_name = if let Some(package_node) = get_package_declaration_node(&ts_file) {
-            get_package_name(&ts_file, &package_node).unwrap_or_else(|| "No package".to_string())
+            get_package_scope_node(&ts_file, package_node)
+                .and_then(|name_node| ts_file.get_text_from_node(&name_node))
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "No package".to_string())
         } else {
             "No package".to_string()
         };
