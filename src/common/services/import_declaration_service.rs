@@ -278,9 +278,13 @@ pub fn find_import_declaration_node<'a>(
 pub fn add_import<'a>(
     ts_file: &'a mut TSFile,
     insertion_position: &ImportInsertionPosition,
-    import_text: &str,
+    import_package_scope: &str,
+    import_class: &str,
 ) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || import_text.trim().is_empty() {
+    if ts_file.tree.is_none()
+        || import_package_scope.trim().is_empty()
+        || import_class.trim().is_empty()
+    {
         return None;
     }
     // Get the root node to work with the entire file
@@ -343,14 +347,15 @@ pub fn add_import<'a>(
         let insertion_byte = import_insertion_point.insert_byte;
         let before = &file_content[..insertion_byte];
         let after = &file_content[insertion_byte..];
+        let formated_import_text = format!("import {}.{};", import_package_scope, import_class);
         match (
             import_insertion_point.break_line_before,
             import_insertion_point.break_line_after,
         ) {
-            (true, true) => format!("{}\n\n{}{}", before, import_text, after),
-            (true, false) => format!("{}\n{}{}", before, import_text, after),
-            (false, true) => format!("{}{}\n{}", before, import_text, after),
-            (false, false) => format!("{}{}{}", before, import_text, after),
+            (true, true) => format!("{}\n\n{}{}", before, formated_import_text, after),
+            (true, false) => format!("{}\n{}{}", before, formated_import_text, after),
+            (false, true) => format!("{}{}\n{}", before, formated_import_text, after),
+            (false, false) => format!("{}{}{}", before, formated_import_text, after),
         }
     };
     // Replace the entire file content with the new content
