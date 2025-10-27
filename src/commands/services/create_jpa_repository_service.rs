@@ -69,11 +69,11 @@ fn file_response_from_ts_file(ts_file: &TSFile) -> Result<FileResponse, String> 
         .and_then(|p| p.extension().and_then(|e| e.to_str()))
         .map(|ext| ext.to_string())
         .unwrap_or_default();
-    let package_name =
-        crate::common::services::package_declaration_service::get_package_declaration_node(ts_file)
-            .and_then(|node| ts_file.get_text_from_node(&node).map(|s| s.to_string()))
-            .unwrap_or_default();
-
+    let package_declaration_node = crate::common::services::package_declaration_service::get_package_declaration_node(ts_file);
+    let package_name = package_declaration_node
+        .and_then(|node| crate::common::services::package_declaration_service::get_package_scope_node(ts_file, node))
+        .and_then(|scope_node| ts_file.get_text_from_node(&scope_node).map(|s| s.to_string()))
+        .unwrap_or_default();
     Ok(FileResponse {
         file_path,
         file_type,
