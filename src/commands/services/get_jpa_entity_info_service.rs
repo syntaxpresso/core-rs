@@ -41,7 +41,7 @@ fn check_is_jpa_entity(ts_file: &TSFile, class_node: &Node) -> Result<bool, Stri
         annotation_service::find_annotation_node_by_name(ts_file, *class_node, "Entity");
     match entity_annotation_node {
         Some(_) => Ok(true),
-        None => Err("Unable to check if is JPA Entity".to_string()),
+        None => Ok(false),
     }
 }
 

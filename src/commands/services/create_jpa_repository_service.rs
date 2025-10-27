@@ -184,15 +184,29 @@ pub fn run(
                 entity_type.as_ref(),
                 &jpa_entity_info,
             )?;
-            return match jpa_repository_ts_file.save() {
+            match jpa_repository_ts_file.save() {
                 Ok(_) => {
                     let file_response = file_response_from_ts_file(&jpa_repository_ts_file)?;
                     let response = create_jpa_repository_response(true, None, Some(file_response));
                     Ok(response)
                 }
                 Err(_) => Err("Unable to create response".to_string()),
-            };
+            }
+        } else {
+            let superclass_type = jpa_entity_info.superclass_type;
+            let response = create_jpa_repository_response(false, superclass_type, None);
+            Ok(response)
         }
+    } else {
+        let jpa_entity_info = get_jpa_entity_info(None, b64_superclass_source)?;
+        let superclass_type = jpa_entity_info.superclass_type;
+        if superclass_type.is_none()
+            && (jpa_entity_info.id_field_type.is_none()
+                || jpa_entity_info.id_field_package_name.is_none())
+        {
+            return Err("Unable to find ID field for this JPA Entity".to_string());
+        }
+        let response = create_jpa_repository_response(false, superclass_type, None);
+        Ok(response)
     }
-    Ok(create_jpa_repository_response(false, None, None))
 }
