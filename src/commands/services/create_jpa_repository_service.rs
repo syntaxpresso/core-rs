@@ -149,18 +149,76 @@ fn extend_jpa_repository(
     );
 }
 
-fn parse_entity_file(path: &Path) -> Result<TSFile, String> {
-    match TSFile::from_file(path) {
-        Ok(ts_file) => Ok(ts_file),
-        Err(_) => Err("Unable to parse JPA Entity file".to_string()),
-    }
+fn step_parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
+    TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
 }
 
-fn get_jpa_entity_info(
+fn step_extract_entity_type(entity_ts_file: &TSFile) -> String {
+    entity_ts_file
+        .get_file_name_without_ext()
+        .unwrap_or_else(|| "Unknown".to_string())
+}
+
+fn step_get_jpa_entity_info(
     entity_file_path: Option<&Path>,
     b64_source_code: Option<&str>,
 ) -> Result<GetJpaEntityInfoResponse, String> {
     get_jpa_entity_info_service::run(entity_file_path, b64_source_code)
+}
+
+fn step_process_entity_without_superclass(
+    cwd: &Path,
+    entity_ts_file: &TSFile,
+    entity_type: &str,
+    jpa_entity_info: &GetJpaEntityInfoResponse,
+) -> Result<CreateJPARepositoryResponse, String> {
+    if jpa_entity_info.is_jpa_entity
+        && jpa_entity_info.id_field_type.is_some()
+        && jpa_entity_info.id_field_package_name.is_some()
+    {
+        step_create_repository_and_save(cwd, entity_ts_file, entity_type, jpa_entity_info)
+    } else {
+        let superclass_type = jpa_entity_info.superclass_type.clone();
+        let response = create_jpa_repository_response(false, superclass_type, None);
+        Ok(response)
+    }
+}
+
+fn step_process_entity_with_superclass(
+    cwd: &Path,
+    entity_ts_file: &TSFile,
+    entity_type: &str,
+    jpa_entity_info: &GetJpaEntityInfoResponse,
+) -> Result<CreateJPARepositoryResponse, String> {
+    // If the superclass is not a JPA entity but has a superclass (like MappedSuperclass extending BaseEntity),
+    // return the superclass type instead of trying to create a repository
+    if !jpa_entity_info.is_jpa_entity && jpa_entity_info.superclass_type.is_some() {
+        let superclass_type = jpa_entity_info.superclass_type.clone();
+        let response = create_jpa_repository_response(false, superclass_type, None);
+        return Ok(response);
+    }
+    if jpa_entity_info.id_field_type.is_none() || jpa_entity_info.id_field_package_name.is_none() {
+        return Err("Unable to find ID field for this JPA Entity".to_string());
+    }
+    step_create_repository_and_save(cwd, entity_ts_file, entity_type, jpa_entity_info)
+}
+
+fn step_create_repository_and_save(
+    cwd: &Path,
+    entity_ts_file: &TSFile,
+    entity_type: &str,
+    jpa_entity_info: &GetJpaEntityInfoResponse,
+) -> Result<CreateJPARepositoryResponse, String> {
+    let mut jpa_repository_ts_file =
+        create_and_extend_jpa_repository(cwd, entity_ts_file, entity_type, jpa_entity_info)?;
+    match jpa_repository_ts_file.save() {
+        Ok(_) => {
+            let file_response = create_file_response(&jpa_repository_ts_file)?;
+            let response = create_jpa_repository_response(true, None, Some(file_response));
+            Ok(response)
+        }
+        Err(_) => Err("Unable to create response".to_string()),
+    }
 }
 
 pub fn run(
@@ -169,53 +227,18 @@ pub fn run(
     b64_superclass_source: Option<&str>,
 ) -> Result<CreateJPARepositoryResponse, String> {
     // Step 1: Parse JPA Entity file
-    let entity_ts_file = parse_entity_file(entity_file_path)?;
-    let entity_type = entity_ts_file
-        .get_file_name_without_ext()
-        .unwrap_or_else(|| "Unknown".to_string());
+    let entity_ts_file = step_parse_entity_file(entity_file_path)?;
+    // Step 2: Extract entity type from file name
+    let entity_type = step_extract_entity_type(&entity_ts_file);
     if b64_superclass_source.is_none() {
-        let jpa_entity_info = get_jpa_entity_info(Some(entity_file_path), None)?;
-        if jpa_entity_info.is_jpa_entity
-            && jpa_entity_info.id_field_type.is_some()
-            && jpa_entity_info.id_field_package_name.is_some()
-        {
-            let mut jpa_repository_ts_file = create_and_extend_jpa_repository(
-                cwd,
-                &entity_ts_file,
-                entity_type.as_ref(),
-                &jpa_entity_info,
-            )?;
-            match jpa_repository_ts_file.save() {
-                Ok(_) => {
-                    let file_response = create_file_response(&jpa_repository_ts_file)?;
-                    let response = create_jpa_repository_response(true, None, Some(file_response));
-                    Ok(response)
-                }
-                Err(_) => Err("Unable to create response".to_string()),
-            }
-        } else {
-            let superclass_type = jpa_entity_info.superclass_type;
-            let response = create_jpa_repository_response(false, superclass_type, None);
-            Ok(response)
-        }
+        // Step 3: Get JPA entity info from entity file
+        let jpa_entity_info = step_get_jpa_entity_info(Some(entity_file_path), None)?;
+        // Step 4: Process entity without superclass
+        step_process_entity_without_superclass(cwd, &entity_ts_file, &entity_type, &jpa_entity_info)
     } else {
-        let jpa_entity_info = get_jpa_entity_info(None, b64_superclass_source)?;
-        if jpa_entity_info.id_field_type.is_none() || jpa_entity_info.id_field_package_name.is_none() {
-            return Err("Unable to find ID field for this JPA Entity".to_string());
-        }
-        let mut jpa_repository_ts_file = create_and_extend_jpa_repository(
-            cwd,
-            &entity_ts_file,
-            entity_type.as_ref(),
-            &jpa_entity_info,
-        )?;
-        match jpa_repository_ts_file.save() {
-            Ok(_) => {
-                let file_response = create_file_response(&jpa_repository_ts_file)?;
-                let response = create_jpa_repository_response(true, None, Some(file_response));
-                Ok(response)
-            }
-            Err(_) => Err("Unable to create response".to_string()),
-        }
+        // Step 3: Get JPA entity info from superclass source
+        let jpa_entity_info = step_get_jpa_entity_info(None, b64_superclass_source)?;
+        // Step 4: Process entity with superclass
+        step_process_entity_with_superclass(cwd, &entity_ts_file, &entity_type, &jpa_entity_info)
     }
 }
