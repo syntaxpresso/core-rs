@@ -256,6 +256,7 @@ pub fn run(
     let entity_path = ts_file
         .file_path()
         .map(|path| path.to_string_lossy().to_string());
+    // Step 8: Get superclass type
     let superclass_name = get_superclass_name(&ts_file, &public_class_node);
     Ok(GetJpaEntityInfoResponse {
         is_jpa_entity,
