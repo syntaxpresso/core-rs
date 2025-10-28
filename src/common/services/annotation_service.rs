@@ -357,7 +357,18 @@ pub fn add_annotation<'a>(
                 let relative_pos = first_annotation.start_byte() - declaration_start_byte;
                 let before = &current_text[..relative_pos];
                 let after = &current_text[relative_pos..];
-                format!("{}{}{}\n{}", before, indentation, annotation_text, after)
+                
+                // If 'before' is empty (meaning first annotation has no indentation), 
+                // use the detected indentation from field context
+                if before.trim().is_empty() && !indentation.is_empty() {
+                    format!("{}{}\n{}", indentation, annotation_text, after)
+                } else if before.is_empty() {
+                    // Fallback: use field-level indentation (2 spaces for fields)
+                    format!("  {}\n{}", annotation_text, after)
+                } else {
+                    // Use the existing indentation pattern
+                    format!("{}{}\n{}", before, annotation_text, after)
+                }
             } else {
                 // No annotations exist, insert at beginning
                 format!("{}{}\n{}", indentation, annotation_text, current_text)
@@ -427,6 +438,52 @@ public class TestUser {
             }
         }
         panic!("Could not find test4 field");
+    }
+
+    #[test]
+    fn test_multiple_annotation_indentation() {
+        let source = r#"package com.example;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+
+@Entity
+public class TestUser {
+  @Column(name = "name", nullable = false)
+  private String name;
+
+  private Integer test3;
+}"#;
+
+        let mut ts_file = TSFile::from_source_code(source);
+        
+        // Find the test3 field
+        if let Ok(nodes) = ts_file.query("(field_declaration) @field") {
+            for node in nodes.iter() {
+                if let Some(text) = ts_file.get_text_from_node(node) {
+                    if text.contains("test3") {
+                        let field_decl_start = node.start_byte();
+                        
+                        // Add first annotation
+                        let position = AnnotationInsertionPosition::AboveScopeDeclaration;
+                        add_annotation(&mut ts_file, field_decl_start, &position, "@Column(name = \"test\")");
+                        
+                        // Add second annotation (this should also have proper indentation)
+                        let position = AnnotationInsertionPosition::BeforeFirstAnnotation;
+                        add_annotation(&mut ts_file, field_decl_start, &position, "@JsonView(Views.Public.class)");
+                        
+                        let result = &ts_file.source_code;
+                        println!("Multiple annotation result:\n{}", result);
+                        
+                        // Both annotations should have consistent 2-space indentation
+                        assert!(result.contains("  @Column(name = \"test\")"), "First annotation should have 2-space indentation");
+                        assert!(result.contains("  @JsonView(Views.Public.class)"), "Second annotation should have 2-space indentation");
+                        return;
+                    }
+                }
+            }
+        }
+        panic!("Could not find test3 field");
     }
 }
 
