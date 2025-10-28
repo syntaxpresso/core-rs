@@ -364,7 +364,7 @@ pub fn add_field_declaration<'a>(
     ts_file: &'a mut TSFile,
     class_declaration_byte_position: usize,
     params: AddFieldDeclarationParams<'a>,
-) -> Option<()> {
+) -> Option<usize> {
     if ts_file.tree.is_none()
         || params.field_type.trim().is_empty()
         || params.field_name.trim().is_empty()
@@ -502,14 +502,23 @@ pub fn add_field_declaration<'a>(
         }
     };
     // Replace the class body with the new content - tree is updated incrementally
-    // The replace_text_by_byte_range function returns Option<Node> on success, or None on failure.
-    // We map the successful Some(Node) to Some(()) to signal success without a value.
-    // If it returns None, the None is propagated, signaling failure.
-    ts_file
-        .replace_text_by_byte_range(
-            class_body_start_byte,
-            class_body_end_byte,
-            &new_body_content,
-        )
-        .map(|_| ())
+    let update_success = ts_file.replace_text_by_byte_range(
+        class_body_start_byte,
+        class_body_end_byte,
+        &new_body_content,
+    );
+    if update_success.is_some() {
+        // The tree is updated. We must get the class node again from the *new* tree.
+        let new_class_decl_node =
+            ts_file.get_named_node_at_byte_position(class_declaration_byte_position)?;
+        // Now, find the new field node we just added
+        let new_field_node =
+            find_field_declaration_node_by_name(ts_file, params.field_name, new_class_decl_node)?;
+
+        // Return its start_byte instead of the node itself
+        Some(new_field_node.start_byte())
+    } else {
+        // Replacement failed
+        None
+    }
 }
