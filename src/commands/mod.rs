@@ -1,4 +1,5 @@
 pub mod create_java_file_command;
+pub mod create_jpa_entity_basic_field_command;
 pub mod create_jpa_entity_command;
 pub mod create_jpa_repository_command;
 pub mod get_all_files_command;
@@ -17,7 +18,9 @@ use crate::{
         package_name_validator::validate_package_name,
     },
     common::types::{
-        java_file_type::JavaFileType, java_source_directory_type::JavaSourceDirectoryType,
+        basic_field_config::BasicFieldConfig, java_field_temporal::JavaFieldTemporal,
+        java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
+        java_source_directory_type::JavaSourceDirectoryType,
     },
 };
 
@@ -72,6 +75,37 @@ pub enum Commands {
 
         #[arg(long, required = false)]
         b64_source_code: Option<String>,
+    },
+    CreateJPAEntityBasicField {
+        #[arg(long, value_parser = validate_directory, required = true)]
+        cwd: PathBuf,
+
+        #[arg(long, required = true)]
+        entity_file_path: PathBuf,
+
+        #[arg(long, required = true)]
+        field_name: String,
+
+        #[arg(long, required = true)]
+        field_type: String,
+
+        #[arg(long, required = false)]
+        field_type_package_name: Option<String>,
+
+        #[arg(long, required = false)]
+        field_length: Option<u16>,
+
+        #[arg(long, required = false)]
+        field_precision: Option<u16>,
+
+        #[arg(long, required = false)]
+        field_scale: u16,
+
+        #[arg(long, required = false)]
+        field_temporal: Option<JavaFieldTemporal>,
+
+        #[arg(long, required = false)]
+        field_timezone_storage: Option<JavaFieldTimeZoneStorage>,
     },
 }
 
@@ -128,6 +162,35 @@ impl Commands {
                     cwd.as_path(),
                     entity_file_path.as_deref(),
                     b64_source_code.as_deref(),
+                );
+                response.to_json_pretty().map_err(|e| e.into())
+            }
+            Commands::CreateJPAEntityBasicField {
+                cwd,
+                entity_file_path,
+                field_name,
+                field_type,
+                field_type_package_name,
+                field_length,
+                field_precision,
+                field_scale,
+                field_temporal,
+                field_timezone_storage,
+            } => {
+                let field_config = BasicFieldConfig {
+                    field_name: field_name.clone(),
+                    field_type: field_type.clone(),
+                    field_type_package_name: field_type_package_name.clone(),
+                    field_length: *field_length,
+                    field_precision: *field_precision,
+                    field_scale: *field_scale,
+                    field_temporal: field_temporal.clone(),
+                    field_timezone_storage: field_timezone_storage.clone(),
+                };
+                let response = create_jpa_entity_basic_field_command::execute(
+                    cwd.as_path(),
+                    entity_file_path.as_path(),
+                    field_config,
                 );
                 response.to_json_pretty().map_err(|e| e.into())
             }
