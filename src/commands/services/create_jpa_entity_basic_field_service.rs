@@ -29,7 +29,19 @@ pub fn run(
     };
     // Add the field and get a confirmation that it was added
 
-    add_field_declaration(&mut entity_ts_file, public_class_node_start_byte, params);
+    let new_field_pos =
+        add_field_declaration(&mut entity_ts_file, public_class_node_start_byte, params)
+            .ok_or_else(|| "Unable to add new field to the JPA Entity".to_string())?;
+
+    let new_field = entity_ts_file
+        .get_node_at_byte_position_with_kind(new_field_pos, "field_declaration")
+        .ok_or_else(|| "Unable to find the newly added field".to_string())?;
+
+    let new_field_str = entity_ts_file
+        .get_text_from_node(&new_field)
+        .ok_or_else(|| "".to_string())?;
+
+    println!("{}", new_field_str);
 
     entity_ts_file
         .save()

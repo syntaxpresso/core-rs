@@ -360,6 +360,46 @@ pub fn get_field_insertion_position<'a>(
     Some(field_insertion_point)
 }
 
+/// Robustly finds the class declaration node from a given byte position,
+/// ascending from annotations or modifiers if necessary.
+fn find_class_declaration_node_from_position<'a>(
+    ts_file: &'a TSFile,
+    byte_position: usize,
+) -> Option<Node<'a>> {
+    let mut node = ts_file.get_named_node_at_byte_position(byte_position)?;
+    // Handle various node types we might encounter
+    match node.kind() {
+        "class_declaration" => Some(node),
+        "modifiers" => node.parent().filter(|p| p.kind() == "class_declaration"),
+        "marker_annotation" | "annotation" => {
+            let mut current = Some(node);
+            while let Some(current_node) = current {
+                if current_node.kind() == "class_declaration" {
+                    return Some(current_node);
+                }
+                current = current_node.parent();
+            }
+            None
+        }
+        _ => {
+            // For other node types, try to find class_declaration in the parent chain
+            let mut current = Some(node);
+            while let Some(current_node) = current {
+                if current_node.kind() == "class_declaration" {
+                    node = current_node;
+                    break;
+                }
+                current = current_node.parent();
+            }
+            if node.kind() == "class_declaration" {
+                Some(node)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 pub fn add_field_declaration<'a>(
     ts_file: &'a mut TSFile,
     class_declaration_byte_position: usize,
@@ -371,52 +411,10 @@ pub fn add_field_declaration<'a>(
     {
         return None;
     }
-    // Find the class declaration node - improved logic to handle complex classes with annotations
-    let class_declaration_node = {
-        let mut node = ts_file.get_named_node_at_byte_position(class_declaration_byte_position)?;
-        // Handle various node types we might encounter
-        match node.kind() {
-            "class_declaration" => node,
-            "modifiers" => {
-                // If we hit modifiers, find the parent class_declaration
-                if let Some(parent) = node.parent() {
-                    if parent.kind() == "class_declaration" {
-                        parent
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            }
-            "marker_annotation" | "annotation" => {
-                // If we hit an annotation, navigate up to find the class_declaration
-                let mut current = Some(node);
-                while let Some(current_node) = current {
-                    if current_node.kind() == "class_declaration" {
-                        break;
-                    }
-                    current = current_node.parent();
-                }
-                current?
-            }
-            _ => {
-                // For other node types, try to find class_declaration in the parent chain
-                let mut current = Some(node);
-                while let Some(current_node) = current {
-                    if current_node.kind() == "class_declaration" {
-                        node = current_node;
-                        break;
-                    }
-                    current = current_node.parent();
-                }
-                if node.kind() != "class_declaration" {
-                    return None;
-                }
-                node
-            }
-        }
-    };
+    // Find the class declaration node
+    let class_declaration_node =
+        find_class_declaration_node_from_position(ts_file, class_declaration_byte_position)?;
+
     // Get the class body node
     let class_body_node = get_class_body_node(ts_file, class_declaration_node)?;
     // Collect all necessary information before any mutable operations
@@ -510,11 +508,10 @@ pub fn add_field_declaration<'a>(
     if update_success.is_some() {
         // The tree is updated. We must get the class node again from the *new* tree.
         let new_class_decl_node =
-            ts_file.get_named_node_at_byte_position(class_declaration_byte_position)?;
+            find_class_declaration_node_from_position(ts_file, class_declaration_byte_position)?;
         // Now, find the new field node we just added
         let new_field_node =
             find_field_declaration_node_by_name(ts_file, params.field_name, new_class_decl_node)?;
-
         // Return its start_byte instead of the node itself
         Some(new_field_node.start_byte())
     } else {
