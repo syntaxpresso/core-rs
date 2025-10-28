@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
+use crate::common::services::annotation_service::{add_annotation, add_annotation_argument, add_annotation_single_value};
 use crate::common::ts_file::TSFile;
+use crate::common::types::annotation_types::AnnotationInsertionPosition;
 use crate::common::types::field_types::{FieldInsertionPoint, FieldInsertionPosition};
 use crate::common::types::java_field_modifier::JavaFieldModifier;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
@@ -13,6 +15,120 @@ pub struct AddFieldDeclarationParams<'a> {
     pub field_type: &'a str,
     pub field_name: &'a str,
     pub field_initialization: Option<&'a str>,
+}
+
+pub struct FieldAnnotationBuilder<'a> {
+    ts_file: &'a mut TSFile,
+    field_start_byte: usize,
+}
+
+impl<'a> FieldAnnotationBuilder<'a> {
+    pub fn new(ts_file: &'a mut TSFile, field_start_byte: usize) -> Self {
+        Self {
+            ts_file,
+            field_start_byte,
+        }
+    }
+
+    pub fn add_annotation(&mut self, annotation_text: &str) -> Result<&mut Self, String> {
+        // Find the actual field_declaration node from the byte position
+        let field_node = self.find_field_declaration_node()
+            .ok_or("Failed to find field declaration node")?;
+        
+        add_annotation(
+            self.ts_file,
+            field_node.start_byte(),
+            &AnnotationInsertionPosition::AboveScopeDeclaration,
+            annotation_text,
+        )
+        .ok_or_else(|| format!("Failed to add annotation: {}", annotation_text))?;
+        Ok(self)
+    }
+
+    fn find_field_declaration_node(&self) -> Option<Node<'_>> {
+        // Start from the byte position and traverse up to find field_declaration
+        let mut current_node = self.ts_file.get_named_node_at_byte_position(self.field_start_byte)?;
+        
+        // If we're already at a field_declaration, return it
+        if current_node.kind() == "field_declaration" {
+            return Some(current_node);
+        }
+        
+        // Traverse up the parent chain to find field_declaration
+        while let Some(parent) = current_node.parent() {
+            if parent.kind() == "field_declaration" {
+                return Some(parent);
+            }
+            current_node = parent;
+        }
+        
+        None
+    }
+
+    pub fn with_argument(&mut self, annotation_text: &str, key: &str, value: &str) -> Result<&mut Self, String> {
+        // Find the actual field_declaration node first
+        let field_node = self.find_field_declaration_node()
+            .ok_or("Failed to find field declaration node")?;
+        
+        // Search for the annotation within the field's scope
+        let annotation_nodes = crate::common::services::annotation_service::get_all_annotation_nodes(self.ts_file, field_node);
+        
+        // Find the specific annotation by checking its text
+        let target_annotation = annotation_nodes
+            .iter()
+            .find(|node| {
+                if let Some(text) = self.ts_file.get_text_from_node(node) {
+                    text.contains(annotation_text)
+                } else {
+                    false
+                }
+            })
+            .ok_or_else(|| format!("Failed to find annotation: {}", annotation_text))?;
+
+        add_annotation_argument(
+            self.ts_file,
+            target_annotation.start_byte(),
+            key,
+            value,
+        )
+        .ok_or_else(|| format!("Failed to add argument {}={} to annotation {}", key, value, annotation_text))?;
+        
+        Ok(self)
+    }
+
+    pub fn with_value(&mut self, annotation_text: &str, value: &str) -> Result<&mut Self, String> {
+        // Find the actual field_declaration node first
+        let field_node = self.find_field_declaration_node()
+            .ok_or("Failed to find field declaration node")?;
+        
+        // Search for the annotation within the field's scope
+        let annotation_nodes = crate::common::services::annotation_service::get_all_annotation_nodes(self.ts_file, field_node);
+        
+        // Find the specific annotation by checking its text
+        let target_annotation = annotation_nodes
+            .iter()
+            .find(|node| {
+                if let Some(text) = self.ts_file.get_text_from_node(node) {
+                    text.contains(annotation_text)
+                } else {
+                    false
+                }
+            })
+            .ok_or_else(|| format!("Failed to find annotation: {}", annotation_text))?;
+
+        add_annotation_single_value(
+            self.ts_file,
+            target_annotation.start_byte(),
+            value,
+        )
+        .ok_or_else(|| format!("Failed to add single value {} to annotation {}", value, annotation_text))?;
+        
+        Ok(self)
+    }
+
+    pub fn build(&mut self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 pub fn get_all_field_declaration_nodes<'a>(
@@ -400,11 +516,15 @@ fn find_class_declaration_node_from_position<'a>(
     }
 }
 
-pub fn add_field_declaration<'a>(
+pub fn add_field_declaration<'a, F, R>(
     ts_file: &'a mut TSFile,
     class_declaration_byte_position: usize,
     params: AddFieldDeclarationParams<'a>,
-) -> Option<usize> {
+    callback: F,
+) -> Option<R>
+where
+    F: FnOnce(&mut FieldAnnotationBuilder<'a>) -> R,
+{
     if ts_file.tree.is_none()
         || params.field_type.trim().is_empty()
         || params.field_name.trim().is_empty()
@@ -414,7 +534,6 @@ pub fn add_field_declaration<'a>(
     // Find the class declaration node
     let class_declaration_node =
         find_class_declaration_node_from_position(ts_file, class_declaration_byte_position)?;
-
     // Get the class body node
     let class_body_node = get_class_body_node(ts_file, class_declaration_node)?;
     // Collect all necessary information before any mutable operations
@@ -512,8 +631,10 @@ pub fn add_field_declaration<'a>(
         // Now, find the new field node we just added
         let new_field_node =
             find_field_declaration_node_by_name(ts_file, params.field_name, new_class_decl_node)?;
-        // Return its start_byte instead of the node itself
-        Some(new_field_node.start_byte())
+        let field_start_byte = new_field_node.start_byte();
+        // Create the builder and call the callback
+        let mut builder = FieldAnnotationBuilder::new(ts_file, field_start_byte);
+        Some(callback(&mut builder))
     } else {
         // Replacement failed
         None

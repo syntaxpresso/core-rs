@@ -222,10 +222,17 @@ pub fn add_annotation<'a>(
         declaration_node.as_ref()?;
         let mut current_node = declaration_node.unwrap();
         let mut node_kind = current_node.kind();
-        // If we found a modifiers node, look for the parent class_declaration
+
+        // If we found a modifiers node, look for the parent declaration
         if node_kind == "modifiers"
             && let Some(parent) = current_node.parent()
-            && parent.kind() == "class_declaration"
+            && matches!(
+                parent.kind(),
+                "class_declaration"
+                    | "field_declaration"
+                    | "method_declaration"
+                    | "interface_declaration"
+            )
         {
             current_node = parent;
             node_kind = current_node.kind();
@@ -382,6 +389,72 @@ pub fn add_annotation_argument<'a>(
             let before = &current_text[..insert_pos];
             let after = &current_text[insert_pos..];
             format!("{}, {}{}", before, argument_pair, after)
+        }
+    };
+    ts_file.replace_text_by_byte_range(annotation_start_byte, annotation_end_byte, &new_content)
+}
+
+pub fn add_annotation_single_value<'a>(
+    ts_file: &'a mut TSFile,
+    annotation_byte_position: usize,
+    value: &str,
+) -> Option<Node<'a>> {
+    if ts_file.tree.is_none() || value.trim().is_empty() {
+        return None;
+    }
+    // Collect all necessary information before any mutable operations
+    let (
+        annotation_start_byte,
+        annotation_end_byte,
+        node_kind,
+        current_text,
+        name_node_info,
+        existing_arguments,
+    ) = {
+        // Find the annotation node at the given byte position
+        let annotation_node = ts_file.get_named_node_at_byte_position(annotation_byte_position)?;
+        let node_kind = annotation_node.kind();
+        if !matches!(node_kind, "annotation" | "marker_annotation") {
+            return None;
+        }
+        let current_text = ts_file.get_text_from_node(&annotation_node)?.to_string();
+        let name_node_info = get_annotation_name_node(ts_file, annotation_node)
+            .map(|n| n.end_byte() - annotation_node.start_byte());
+        let existing_arguments = get_annotation_argument_pair_nodes(ts_file, annotation_node);
+        (
+            annotation_node.start_byte(),
+            annotation_node.end_byte(),
+            node_kind,
+            current_text,
+            name_node_info,
+            existing_arguments,
+        )
+    };
+    let new_content = if node_kind == "marker_annotation" {
+        // Convert marker annotation to annotation with single value
+        // @Test -> @Test(value)
+        let name_end_pos = name_node_info?;
+        let before = &current_text[..name_end_pos];
+        let after = &current_text[name_end_pos..];
+        format!("{}({}){}", before, value, after)
+    } else {
+        // Add single value to existing annotation
+        if existing_arguments.is_empty() {
+            // No existing arguments, add single value
+            // @JsonView -> @JsonView(Views.Public.class)
+            let name_end_pos = name_node_info?;
+            let before = &current_text[..name_end_pos];
+            let after = &current_text[name_end_pos..];
+            format!("{}({}){}", before, value, after)
+        } else {
+            // Existing arguments present - need to check if it's single value or named arguments
+            // For simplicity, we'll add as a named argument with key "value"
+            // This handles the case where someone might mix single value with named arguments
+            let last_argument = existing_arguments.last()?;
+            let insert_pos = last_argument.end_byte() - annotation_start_byte;
+            let before = &current_text[..insert_pos];
+            let after = &current_text[insert_pos..];
+            format!("{}, value = {}{}", before, value, after)
         }
     };
     ts_file.replace_text_by_byte_range(annotation_start_byte, annotation_end_byte, &new_content)
