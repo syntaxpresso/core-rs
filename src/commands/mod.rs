@@ -99,13 +99,22 @@ pub enum Commands {
         field_precision: Option<u16>,
 
         #[arg(long, required = false)]
-        field_scale: u16,
+        field_scale: Option<u16>,
 
         #[arg(long, required = false)]
         field_temporal: Option<JavaFieldTemporal>,
 
         #[arg(long, required = false)]
         field_timezone_storage: Option<JavaFieldTimeZoneStorage>,
+
+        #[arg(long, required = false)]
+        field_unique: Option<bool>,
+
+        #[arg(long, required = false)]
+        field_nullable: Option<bool>,
+
+        #[arg(long, required = false)]
+        field_large_object: Option<bool>,
     },
 }
 
@@ -176,6 +185,9 @@ impl Commands {
                 field_scale,
                 field_temporal,
                 field_timezone_storage,
+                field_unique,
+                field_nullable,
+                field_large_object,
             } => {
                 let field_config = BasicFieldConfig {
                     field_name: field_name.clone(),
@@ -186,6 +198,9 @@ impl Commands {
                     field_scale: *field_scale,
                     field_temporal: field_temporal.clone(),
                     field_timezone_storage: field_timezone_storage.clone(),
+                    field_unique: *field_unique,
+                    field_nullable: *field_nullable,
+                    field_large_object: *field_large_object,
                 };
                 let response = create_jpa_entity_basic_field_command::execute(
                     cwd.as_path(),
