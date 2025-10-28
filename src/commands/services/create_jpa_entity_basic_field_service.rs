@@ -27,22 +27,22 @@ pub fn run(
         field_name: &field_config.field_name,
         field_initialization: None,
     };
-    // Add the field and get a confirmation that it was added
-
-    let new_field_pos =
-        add_field_declaration(&mut entity_ts_file, public_class_node_start_byte, params)
-            .ok_or_else(|| "Unable to add new field to the JPA Entity".to_string())?;
-
-    let new_field = entity_ts_file
-        .get_node_at_byte_position_with_kind(new_field_pos, "field_declaration")
-        .ok_or_else(|| "Unable to find the newly added field".to_string())?;
-
-    let new_field_str = entity_ts_file
-        .get_text_from_node(&new_field)
-        .ok_or_else(|| "".to_string())?;
-
-    println!("{}", new_field_str);
-
+    // Add the field and annotations using the callback pattern
+    add_field_declaration(
+        &mut entity_ts_file,
+        public_class_node_start_byte,
+        params,
+        |builder| {
+            builder
+                .add_annotation("@Column")?
+                .with_argument("@Column", "name", "\"test\"")?
+                .add_annotation("@JsonView")?
+                .with_value("@JsonView", "Views.Public.class")?
+                .build()
+        },
+    )
+    .ok_or_else(|| "Unable to add new field to the JPA Entity".to_string())?
+    .map_err(|e| format!("Unable to add annotations: {}", e))?;
     entity_ts_file
         .save()
         .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;

@@ -205,6 +205,44 @@ pub fn find_annotation_value_node_by_key<'a>(
         .first_node()
 }
 
+/// Detects the indentation level for a declaration node by analyzing existing annotations or the declaration line
+fn detect_indentation(ts_file: &TSFile, declaration_node: Node, all_annotations: &[Node]) -> String {
+    // If there are existing annotations, use their indentation
+    if let Some(first_annotation) = all_annotations.first() {
+        let full_text = &ts_file.source_code;
+        let annotation_start = first_annotation.start_byte();
+        
+        // Find the start of the line containing this annotation
+        let line_start = full_text[..annotation_start]
+            .rfind('\n')
+            .map(|pos| pos + 1)
+            .unwrap_or(0);
+        
+        // Extract indentation (spaces/tabs before the annotation)
+        if let Some(line_text) = full_text.get(line_start..annotation_start) {
+            return line_text.to_string();
+        }
+    }
+    
+    // If no existing annotations, analyze the declaration line itself
+    let full_text = &ts_file.source_code;
+    let decl_start = declaration_node.start_byte();
+    
+    // Find the start of the line containing this declaration
+    let line_start = full_text[..decl_start]
+        .rfind('\n')
+        .map(|pos| pos + 1)
+        .unwrap_or(0);
+    
+    // Extract indentation from the declaration line
+    if let Some(line_text) = full_text.get(line_start..decl_start) {
+        return line_text.to_string();
+    }
+    
+    // Fallback: use 2 spaces (common Java indentation for field annotations)
+    "  ".to_string()
+}
+
 pub fn add_annotation<'a>(
     ts_file: &'a mut TSFile,
     declaration_byte_position: usize,
@@ -215,14 +253,13 @@ pub fn add_annotation<'a>(
         return None;
     }
     // Collect all necessary information before any mutable operations
-    let (declaration_start_byte, declaration_end_byte, _node_kind, current_text, all_annotations) = {
+    let (declaration_start_byte, declaration_end_byte, _node_kind, current_text, all_annotations, indentation) = {
         // Find the declaration node at the given byte position
         let mut declaration_node =
             ts_file.get_named_node_at_byte_position(declaration_byte_position);
         declaration_node.as_ref()?;
         let mut current_node = declaration_node.unwrap();
         let mut node_kind = current_node.kind();
-
         // If we found a modifiers node, look for the parent declaration
         if node_kind == "modifiers"
             && let Some(parent) = current_node.parent()
@@ -263,16 +300,32 @@ pub fn add_annotation<'a>(
         declaration_node = Some(current_node);
         let declaration_node = declaration_node.unwrap();
         let all_annotations = get_all_annotation_nodes(ts_file, declaration_node);
-        let current_text = ts_file.get_text_from_node(&declaration_node);
-        current_text.as_ref()?;
-        let current_text = current_text.unwrap().to_string();
-        (
-            declaration_node.start_byte(),
-            declaration_node.end_byte(),
-            node_kind,
-            current_text,
-            all_annotations,
-        )
+         let current_text = ts_file.get_text_from_node(&declaration_node);
+         current_text.as_ref()?;
+         let current_text = current_text.unwrap().to_string();
+         let indentation = detect_indentation(ts_file, declaration_node, &all_annotations);
+         
+         // Adjust start byte to include indentation when there are no annotations
+         let actual_start_byte = if all_annotations.is_empty() {
+             // Find the actual start including leading whitespace
+             let decl_start = declaration_node.start_byte();
+             let line_start = ts_file.source_code[..decl_start]
+                 .rfind('\n')
+                 .map(|pos| pos + 1)
+                 .unwrap_or(0);
+             line_start
+         } else {
+             declaration_node.start_byte()
+         };
+         
+         (
+             actual_start_byte,
+             declaration_node.end_byte(),
+             node_kind,
+             current_text,
+             all_annotations,
+             indentation,
+         )
     };
     let mut annotation_insertion_point = AnnotationInsertionPoint::new();
     annotation_insertion_point.position = insertion_position.clone();
@@ -304,27 +357,77 @@ pub fn add_annotation<'a>(
                 let relative_pos = first_annotation.start_byte() - declaration_start_byte;
                 let before = &current_text[..relative_pos];
                 let after = &current_text[relative_pos..];
-                format!("{}{}\n{}", before, annotation_text, after)
+                format!("{}{}{}\n{}", before, indentation, annotation_text, after)
             } else {
                 // No annotations exist, insert at beginning
-                format!("{}\n{}", annotation_text, current_text)
+                format!("{}{}\n{}", indentation, annotation_text, current_text)
             }
         }
         AnnotationInsertionPosition::AboveScopeDeclaration => {
             if all_annotations.is_empty() {
                 // No annotations exist, insert at beginning
-                format!("{}\n{}", annotation_text, current_text)
+                // Since we're now including the leading whitespace in the replacement range,
+                // we need to format the content with proper indentation for both annotation and field
+                format!("{}{}\n{}{}", indentation, annotation_text, indentation, current_text)
             } else {
                 // Insert after last annotation
                 let last_annotation = all_annotations.last()?;
-                let relative_pos = last_annotation.end_byte() - declaration_start_byte;
+                let relative_pos = last_annotation.end_byte() - declaration_start_byte; 
                 let before = &current_text[..relative_pos];
                 let after = &current_text[relative_pos..];
-                format!("{}\n{}{}", before, annotation_text, after)
+                format!("{}\n{}{}{}", before, indentation, annotation_text, after)
             }
         }
     };
     ts_file.replace_text_by_byte_range(declaration_start_byte, declaration_end_byte, &new_content)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::ts_file::TSFile;
+
+    #[test]
+    fn test_annotation_indentation() {
+        let source = r#"package com.example;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+
+@Entity
+public class TestUser {
+  @Column(name = "name", nullable = false)
+  private String name;
+
+  private Integer test4;
+}"#;
+
+        let mut ts_file = TSFile::from_source_code(source);
+        
+        // Debug: check all field declarations
+        if let Ok(nodes) = ts_file.query("(field_declaration) @field") {
+            println!("Found {} field declarations", nodes.len());
+            for (i, node) in nodes.iter().enumerate() {
+                if let Some(text) = ts_file.get_text_from_node(node) {
+                    println!("Field {}: {}", i, text);
+                    if text.contains("test4") {
+                        let field_decl_start = node.start_byte();
+                        let position = AnnotationInsertionPosition::AboveScopeDeclaration;
+                        add_annotation(&mut ts_file, field_decl_start, &position, "@Column(name = \"test4\")");
+                        
+                        // Check that the annotation has proper indentation
+                        let result = &ts_file.source_code;
+                        
+                        // Verify that both annotation and field have consistent 2-space indentation
+                        assert!(result.contains("  @Column(name = \"test4\")"), "Annotation should have 2-space indentation");
+                        assert!(result.contains("  @Column(name = \"test4\")\n  private Integer test4;"), "Annotation and field should have consistent indentation");
+                        return;
+                    }
+                }
+            }
+        }
+        panic!("Could not find test4 field");
+    }
 }
 
 pub fn add_annotation_argument<'a>(
