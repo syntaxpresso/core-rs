@@ -2,7 +2,18 @@
 
 use crate::common::ts_file::TSFile;
 use crate::common::types::field_types::{FieldInsertionPoint, FieldInsertionPosition};
+use crate::common::types::java_field_modifier::JavaFieldModifier;
+use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use tree_sitter::Node;
+
+pub struct AddFieldDeclarationParams<'a> {
+    pub insertion_position: FieldInsertionPosition,
+    pub visibility_modifier: JavaVisibilityModifier,
+    pub field_modifiers: Vec<JavaFieldModifier>,
+    pub field_type: &'a str,
+    pub field_name: &'a str,
+    pub field_initialization: Option<&'a str>,
+}
 
 pub fn get_all_field_declaration_nodes<'a>(
     ts_file: &'a TSFile,
@@ -352,36 +363,153 @@ pub fn get_field_insertion_position<'a>(
 pub fn add_field_declaration<'a>(
     ts_file: &'a mut TSFile,
     class_declaration_byte_position: usize,
-    insertion_position: &FieldInsertionPosition,
-    field_text: &str,
-) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || field_text.trim().is_empty() {
+    params: AddFieldDeclarationParams<'a>,
+) -> Option<()> {
+    if ts_file.tree.is_none()
+        || params.field_type.trim().is_empty()
+        || params.field_name.trim().is_empty()
+    {
         return None;
     }
-    // Get the class declaration node at the specified byte position
-    let class_declaration_node =
-        ts_file.get_named_node_at_byte_position(class_declaration_byte_position)?;
-    if class_declaration_node.kind() != "class_declaration" {
-        return None;
+    // Find the class declaration node - improved logic to handle complex classes with annotations
+    let class_declaration_node = {
+        let mut node = ts_file.get_named_node_at_byte_position(class_declaration_byte_position)?;
+        // Handle various node types we might encounter
+        match node.kind() {
+            "class_declaration" => node,
+            "modifiers" => {
+                // If we hit modifiers, find the parent class_declaration
+                if let Some(parent) = node.parent() {
+                    if parent.kind() == "class_declaration" {
+                        parent
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
+            "marker_annotation" | "annotation" => {
+                // If we hit an annotation, navigate up to find the class_declaration
+                let mut current = Some(node);
+                while let Some(current_node) = current {
+                    if current_node.kind() == "class_declaration" {
+                        break;
+                    }
+                    current = current_node.parent();
+                }
+                current?
+            }
+            _ => {
+                // For other node types, try to find class_declaration in the parent chain
+                let mut current = Some(node);
+                while let Some(current_node) = current {
+                    if current_node.kind() == "class_declaration" {
+                        node = current_node;
+                        break;
+                    }
+                    current = current_node.parent();
+                }
+                if node.kind() != "class_declaration" {
+                    return None;
+                }
+                node
+            }
+        }
+    };
+    // Get the class body node
+    let class_body_node = get_class_body_node(ts_file, class_declaration_node)?;
+    // Collect all necessary information before any mutable operations
+    let (class_body_start_byte, class_body_end_byte, current_body_text, all_fields) = {
+        let current_body_text = ts_file.get_text_from_node(&class_body_node)?.to_string();
+        let all_fields = get_all_field_declaration_nodes(ts_file, class_declaration_node);
+        (
+            class_body_node.start_byte(),
+            class_body_node.end_byte(),
+            current_body_text,
+            all_fields,
+        )
+    };
+    // Build the field declaration text
+    let modifiers_str = params
+        .field_modifiers
+        .iter()
+        .map(|m| m.keyword())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut field_text = String::new();
+    field_text.push_str("  "); // Indentation
+    if params.visibility_modifier.has_keyword() {
+        field_text.push_str(params.visibility_modifier.keyword());
+        field_text.push(' ');
     }
-    // Get the insertion point
-    let insertion_point =
-        get_field_insertion_position(ts_file, class_declaration_node, insertion_position)?;
-    // Build the insert text with proper formatting
-    let mut insert_text = String::new();
-    if insertion_point.break_line_before {
-        insert_text.push('\n');
+    if !modifiers_str.is_empty() {
+        field_text.push_str(&modifiers_str);
+        field_text.push(' ');
     }
-    // Add indentation (2 spaces for fields)
-    insert_text.push_str("  ");
-    insert_text.push_str(field_text);
-    if insertion_point.break_line_after {
-        insert_text.push('\n');
+    field_text.push_str(params.field_type);
+    field_text.push(' ');
+    field_text.push_str(params.field_name);
+    if let Some(field_init) = params.field_initialization
+        && !field_init.trim().is_empty()
+    {
+        field_text.push_str(" = ");
+        field_text.push_str(field_init);
     }
-    // Insert the field declaration at the calculated position
-    ts_file.replace_text_by_byte_range(
-        insertion_point.insert_byte,
-        insertion_point.insert_byte,
-        &insert_text,
-    )
+    field_text.push(';');
+    // Build the new class body content with the field inserted at the proper position
+    let new_body_content = match params.insertion_position {
+        FieldInsertionPosition::AfterLastField => {
+            if !all_fields.is_empty() {
+                // Insert after last field
+                let last_field = all_fields.last()?;
+                let relative_pos = last_field.end_byte() - class_body_start_byte;
+                let before = &current_body_text[..relative_pos];
+                let after = &current_body_text[relative_pos..];
+                format!("{}\n{}{}", before, field_text, after)
+            } else {
+                // No fields exist, insert after opening brace and before any content
+                // The class body text includes braces, so we need to find the right position
+                if let Some(after_brace) = current_body_text.strip_prefix('{') {
+                    format!("{{\n{}{}", field_text, after_brace)
+                } else {
+                    current_body_text
+                }
+            }
+        }
+        FieldInsertionPosition::BeforeFirstMethod => {
+            // For now, use same logic as AfterLastField
+            // TODO: Implement method detection if needed
+            if !all_fields.is_empty() {
+                let last_field = all_fields.last()?;
+                let relative_pos = last_field.end_byte() - class_body_start_byte;
+                let before = &current_body_text[..relative_pos];
+                let after = &current_body_text[relative_pos..];
+                format!("{}\n{}{}", before, field_text, after)
+            } else if let Some(after_brace) = current_body_text.strip_prefix('{') {
+                format!("{{\n{}{}", field_text, after_brace)
+            } else {
+                current_body_text
+            }
+        }
+        FieldInsertionPosition::EndOfClassBody => {
+            // Insert before the closing brace
+            if let Some(before_brace) = current_body_text.strip_suffix('}') {
+                format!("{}\n{}\n}}", before_brace, field_text)
+            } else {
+                format!("{}\n{}\n", current_body_text, field_text)
+            }
+        }
+    };
+    // Replace the class body with the new content - tree is updated incrementally
+    // The replace_text_by_byte_range function returns Option<Node> on success, or None on failure.
+    // We map the successful Some(Node) to Some(()) to signal success without a value.
+    // If it returns None, the None is propagated, signaling failure.
+    ts_file
+        .replace_text_by_byte_range(
+            class_body_start_byte,
+            class_body_end_byte,
+            &new_body_content,
+        )
+        .map(|_| ())
 }
