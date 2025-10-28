@@ -33,27 +33,6 @@ pub fn get_all_import_declaration_nodes<'a>(ts_file: &'a TSFile) -> Vec<Node<'a>
     }
 }
 
-/// Retrieves the relative import scope node from an import declaration.
-///
-/// This method extracts the package portion of an import statement. For example, in
-/// `import java.util.List;`, it would return the node representing "java.util".
-///
-/// # Arguments
-/// * `ts_file` - Reference to the TSFile containing the parsed Java code
-/// * `import_declaration_node` - The import declaration node to analyze
-///
-/// # Returns
-/// Optional containing the relative import scope node, empty if not found
-///
-/// # Example
-/// ```
-/// // For Java file containing: import java.util.List;
-/// let imports = get_all_import_declaration_nodes(&ts_file);
-/// if let Some(scope_node) = get_import_declaration_relative_import_scope_node(&ts_file, imports[0]) {
-///     let scope_text = ts_file.get_text_from_node(&scope_node);
-///     // scope_text = Some("java.util")
-/// }
-/// ```
 pub fn get_import_declaration_relative_import_scope_node<'a>(
     ts_file: &'a TSFile,
     import_declaration_node: Node<'a>,
@@ -81,27 +60,6 @@ pub fn get_import_declaration_relative_import_scope_node<'a>(
         .first_node()
 }
 
-/// Retrieves the class name node from an import declaration.
-///
-/// This method extracts the class name portion of an import statement. For example, in
-/// `import java.util.List;`, it would return the node representing "List".
-///
-/// # Arguments
-/// * `ts_file` - Reference to the TSFile containing the parsed Java code
-/// * `import_declaration_node` - The import declaration node to analyze
-///
-/// # Returns
-/// Optional containing the class name node, empty if not found or if it's a wildcard import
-///
-/// # Example
-/// ```
-/// // For Java file containing: import java.util.List;
-/// let imports = get_all_import_declaration_nodes(&ts_file);
-/// if let Some(class_name_node) = get_import_declaration_class_name_node(&ts_file, imports[0]) {
-///     let class_name = ts_file.get_text_from_node(&class_name_node);
-///     // class_name = Some("List")
-/// }
-/// ```
 pub fn get_import_declaration_class_name_node<'a>(
     ts_file: &'a TSFile,
     import_declaration_node: Node<'a>,
@@ -129,29 +87,6 @@ pub fn get_import_declaration_class_name_node<'a>(
         .first_node()
 }
 
-/// Retrieves the full import scope node from an import declaration.
-///
-/// This method extracts the complete import path from an import statement. For regular imports
-/// like `import java.util.List;`, it returns the entire "java.util.List". For wildcard
-/// imports like `import java.util.*;`, it returns "java.util".
-///
-/// # Arguments
-/// * `ts_file` - Reference to the TSFile containing the parsed Java code
-/// * `import_declaration_node` - The import declaration node to analyze
-///
-/// # Returns
-/// Optional containing the full import scope node, empty if not found
-///
-/// # Example
-/// ```
-/// // For Java file containing: import java.util.List;
-/// let imports = get_all_import_declaration_nodes(&ts_file);
-/// if let Some(full_scope_node) = get_import_declaration_full_import_scope_node(&ts_file, imports[0]) {
-///     let full_scope = ts_file.get_text_from_node(&full_scope_node);
-///     // full_scope = Some("java.util.List") for regular imports
-///     // full_scope = Some("java.util") for wildcard imports
-/// }
-/// ```
 pub fn get_import_declaration_full_import_scope_node<'a>(
     ts_file: &'a TSFile,
     import_declaration_node: Node<'a>,
@@ -179,28 +114,6 @@ pub fn get_import_declaration_full_import_scope_node<'a>(
         .first_node()
 }
 
-/// Finds the import declaration node for a given package scope and class name.
-///
-/// This method searches for an import declaration that matches the specified package scope and
-/// class name. It handles both regular imports (exact class match) and wildcard imports (package
-/// scope match with asterisk).
-///
-/// # Arguments
-/// * `ts_file` - Reference to the TSFile containing the parsed Java code
-/// * `package_scope` - The package scope to search for (e.g., "java.util")
-/// * `class_name` - The class name to search for (e.g., "List")
-///
-/// # Returns
-/// Optional containing the matching import declaration node, empty if not found or invalid input
-///
-/// # Example
-/// ```
-/// // For Java file containing: import java.util.List; or import java.util.*;
-/// if let Some(import_node) = find_import_declaration_node(&ts_file, "java.util", "List") {
-///     let import_text = ts_file.get_text_from_node(&import_node);
-///     // import_text = Some("import java.util.List;") or covered by "import java.util.*;"
-/// }
-/// ```
 pub fn find_import_declaration_node<'a>(
     ts_file: &'a TSFile,
     package_scope: &str,
@@ -250,31 +163,6 @@ pub fn find_import_declaration_node<'a>(
     None
 }
 
-/// Adds an import declaration to a Java file at the specified insertion position.
-///
-/// This method inserts a new import statement at the appropriate location based on the
-/// insertion position. It handles proper formatting with line breaks and follows Java
-/// import organization conventions.
-///
-/// # Arguments
-/// * `ts_file` - Mutable reference to the TSFile to modify
-/// * `insertion_position` - Where to insert the import (before first, after last, or after package)
-/// * `import_text` - The complete import statement text (e.g., "import java.util.List;")
-///
-/// # Returns
-/// Optional containing the updated root node after insertion, empty if insertion failed
-///
-/// # Example
-/// ```
-/// // Add import after existing imports
-/// if let Some(updated_node) = add_import(
-///     &mut ts_file,
-///     &ImportInsertionPosition::AfterLastImport,
-///     "import java.util.HashMap;"
-/// ) {
-///     // Import successfully added
-/// }
-/// ```
 pub fn add_import<'a>(
     ts_file: &'a mut TSFile,
     insertion_position: &ImportInsertionPosition,

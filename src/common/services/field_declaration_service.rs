@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-use crate::common::services::annotation_service::{add_annotation, add_annotation_argument, add_annotation_single_value};
+use crate::common::services::annotation_service::{
+    add_annotation, add_annotation_argument, add_annotation_single_value,
+};
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_types::AnnotationInsertionPosition;
 use crate::common::types::field_types::{FieldInsertionPoint, FieldInsertionPosition};
@@ -32,9 +34,9 @@ impl<'a> FieldAnnotationBuilder<'a> {
 
     pub fn add_annotation(&mut self, annotation_text: &str) -> Result<&mut Self, String> {
         // Find the actual field_declaration node from the byte position
-        let field_node = self.find_field_declaration_node()
+        let field_node = self
+            .find_field_declaration_node()
             .ok_or("Failed to find field declaration node")?;
-        
         add_annotation(
             self.ts_file,
             field_node.start_byte(),
@@ -47,13 +49,13 @@ impl<'a> FieldAnnotationBuilder<'a> {
 
     fn find_field_declaration_node(&self) -> Option<Node<'_>> {
         // Start from the byte position and traverse up to find field_declaration
-        let mut current_node = self.ts_file.get_named_node_at_byte_position(self.field_start_byte)?;
-        
+        let mut current_node = self
+            .ts_file
+            .get_named_node_at_byte_position(self.field_start_byte)?;
         // If we're already at a field_declaration, return it
         if current_node.kind() == "field_declaration" {
             return Some(current_node);
         }
-        
         // Traverse up the parent chain to find field_declaration
         while let Some(parent) = current_node.parent() {
             if parent.kind() == "field_declaration" {
@@ -61,18 +63,25 @@ impl<'a> FieldAnnotationBuilder<'a> {
             }
             current_node = parent;
         }
-        
         None
     }
 
-    pub fn with_argument(&mut self, annotation_text: &str, key: &str, value: &str) -> Result<&mut Self, String> {
+    pub fn with_argument(
+        &mut self,
+        annotation_text: &str,
+        key: &str,
+        value: &str,
+    ) -> Result<&mut Self, String> {
         // Find the actual field_declaration node first
-        let field_node = self.find_field_declaration_node()
+        let field_node = self
+            .find_field_declaration_node()
             .ok_or("Failed to find field declaration node")?;
-        
         // Search for the annotation within the field's scope
-        let annotation_nodes = crate::common::services::annotation_service::get_all_annotation_nodes(self.ts_file, field_node);
-        
+        let annotation_nodes =
+            crate::common::services::annotation_service::get_all_annotation_nodes(
+                self.ts_file,
+                field_node,
+            );
         // Find the specific annotation by checking its text
         let target_annotation = annotation_nodes
             .iter()
@@ -84,26 +93,27 @@ impl<'a> FieldAnnotationBuilder<'a> {
                 }
             })
             .ok_or_else(|| format!("Failed to find annotation: {}", annotation_text))?;
-
-        add_annotation_argument(
-            self.ts_file,
-            target_annotation.start_byte(),
-            key,
-            value,
-        )
-        .ok_or_else(|| format!("Failed to add argument {}={} to annotation {}", key, value, annotation_text))?;
-        
+        add_annotation_argument(self.ts_file, target_annotation.start_byte(), key, value)
+            .ok_or_else(|| {
+                format!(
+                    "Failed to add argument {}={} to annotation {}",
+                    key, value, annotation_text
+                )
+            })?;
         Ok(self)
     }
 
     pub fn with_value(&mut self, annotation_text: &str, value: &str) -> Result<&mut Self, String> {
         // Find the actual field_declaration node first
-        let field_node = self.find_field_declaration_node()
+        let field_node = self
+            .find_field_declaration_node()
             .ok_or("Failed to find field declaration node")?;
-        
         // Search for the annotation within the field's scope
-        let annotation_nodes = crate::common::services::annotation_service::get_all_annotation_nodes(self.ts_file, field_node);
-        
+        let annotation_nodes =
+            crate::common::services::annotation_service::get_all_annotation_nodes(
+                self.ts_file,
+                field_node,
+            );
         // Find the specific annotation by checking its text
         let target_annotation = annotation_nodes
             .iter()
@@ -115,17 +125,16 @@ impl<'a> FieldAnnotationBuilder<'a> {
                 }
             })
             .ok_or_else(|| format!("Failed to find annotation: {}", annotation_text))?;
+        add_annotation_single_value(self.ts_file, target_annotation.start_byte(), value)
+            .ok_or_else(|| {
+                format!(
+                    "Failed to add single value {} to annotation {}",
+                    value, annotation_text
+                )
+            })?;
 
-        add_annotation_single_value(
-            self.ts_file,
-            target_annotation.start_byte(),
-            value,
-        )
-        .ok_or_else(|| format!("Failed to add single value {} to annotation {}", value, annotation_text))?;
-        
         Ok(self)
     }
-
     pub fn build(&mut self) -> Result<(), String> {
         Ok(())
     }
