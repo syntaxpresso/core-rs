@@ -107,14 +107,14 @@ pub enum Commands {
         #[arg(long, required = false)]
         field_timezone_storage: Option<JavaFieldTimeZoneStorage>,
 
-        #[arg(long, required = false)]
-        field_unique: Option<bool>,
+        #[arg(long)]
+        field_unique: bool,
 
-        #[arg(long, required = false)]
-        field_nullable: Option<bool>,
+        #[arg(long)]
+        field_nullable: bool,
 
-        #[arg(long, required = false)]
-        field_large_object: Option<bool>,
+        #[arg(long)]
+        field_large_object: bool,
     },
 }
 

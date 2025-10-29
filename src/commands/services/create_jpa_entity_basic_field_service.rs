@@ -32,7 +32,7 @@ fn add_to_import_map(
 }
 
 fn add_imports(ts_file: &mut TSFile, import_map: &HashMap<String, String>) {
-    let import_position = ImportInsertionPosition::AfterLastImport;
+    let import_position = ImportInsertionPosition::BeforeFirstImport;
     for (class_name, package_name) in import_map {
         add_import(ts_file, &import_position, package_name, class_name);
     }
@@ -57,7 +57,9 @@ fn process_imports(
         add_to_import_map(import_map, "jakarta.persistence", "TemporalType");
         add_to_import_map(import_map, "java.sql", "Date");
     }
-    if processed_field_config.should_add_lob_annotation {}
+    if processed_field_config.should_add_lob_annotation {
+        add_to_import_map(import_map, "jakarta.persistence", "Lob");
+    }
 }
 
 fn process_field_config(field_config: &BasicFieldConfig) -> ProcessedFieldConfig {
@@ -98,8 +100,9 @@ fn process_field_config(field_config: &BasicFieldConfig) -> ProcessedFieldConfig
     if temporal_aware_types.contains(full_type.as_str()) && field_config.field_temporal.is_some() {
         should_add_temporal_annotation = true;
     }
-    if lob_aware_types.contains(full_type.as_str())
-        && lob_aware_types.contains(field_config.field_type.as_str())
+    if field_config.field_large_object
+        && (lob_aware_types.contains(full_type.as_str())
+            || lob_aware_types.contains(field_config.field_type.as_str()))
     {
         should_add_lob_annotation = true;
     }

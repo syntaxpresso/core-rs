@@ -14,7 +14,7 @@ pub struct BasicFieldConfig {
     pub field_scale: Option<u16>,
     pub field_temporal: Option<JavaFieldTemporal>,
     pub field_timezone_storage: Option<JavaFieldTimeZoneStorage>,
-    pub field_unique: Option<bool>,
-    pub field_nullable: Option<bool>,
-    pub field_large_object: Option<bool>,
+    pub field_unique: bool,
+    pub field_nullable: bool,
+    pub field_large_object: bool,
 }
