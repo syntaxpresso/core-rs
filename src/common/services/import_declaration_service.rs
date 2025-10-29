@@ -175,6 +175,9 @@ pub fn add_import<'a>(
     {
         return None;
     }
+    if find_import_declaration_node(ts_file, import_package_scope, import_class).is_some() {
+        return None;
+    }
     // Get the root node to work with the entire file
     let root_node = ts_file.tree.as_ref()?.root_node();
     let file_content = ts_file.get_text_from_node(&root_node)?.to_string();
