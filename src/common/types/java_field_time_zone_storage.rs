@@ -40,11 +40,11 @@ impl JavaFieldTimeZoneStorage {
     /// Gets the string value associated with the enum constant.
     pub fn as_str(&self) -> &'static str {
         match self {
-            JavaFieldTimeZoneStorage::Native => "native",
-            JavaFieldTimeZoneStorage::Normalize => "normalize",
-            JavaFieldTimeZoneStorage::NormalizeUtc => "normalize_utc",
-            JavaFieldTimeZoneStorage::Column => "column",
-            JavaFieldTimeZoneStorage::Auto => "auto",
+            JavaFieldTimeZoneStorage::Native => "NATIVE",
+            JavaFieldTimeZoneStorage::Normalize => "NORMALIZE",
+            JavaFieldTimeZoneStorage::NormalizeUtc => "NORMALIZE_UTC",
+            JavaFieldTimeZoneStorage::Column => "COLUMN",
+            JavaFieldTimeZoneStorage::Auto => "AUTO",
         }
     }
 }

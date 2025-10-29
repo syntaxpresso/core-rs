@@ -34,9 +34,9 @@ impl JavaFieldTemporal {
     /// Gets the string value of the enum constant.
     pub fn as_str(&self) -> &'static str {
         match self {
-            JavaFieldTemporal::Date => "date",
-            JavaFieldTemporal::Time => "time",
-            JavaFieldTemporal::Timestamp => "timestamp",
+            JavaFieldTemporal::Date => "DATE",
+            JavaFieldTemporal::Time => "TIME",
+            JavaFieldTemporal::Timestamp => "TIMESTAMP",
         }
     }
 }

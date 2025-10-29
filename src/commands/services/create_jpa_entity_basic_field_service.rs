@@ -29,7 +29,7 @@ fn add_to_import_map(hashmap: &mut HashMap<String, String>, class_name: &str, pa
 
 fn add_imports(ts_file: &mut TSFile, import_map: &HashMap<String, String>) {
     let import_position = ImportInsertionPosition::AfterLastImport;
-    for (class_name, package_name) in import_map {
+    for (package_name, class_name) in import_map {
         add_import(ts_file, &import_position, package_name, class_name);
     }
 }
