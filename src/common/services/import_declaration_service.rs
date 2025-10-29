@@ -175,6 +175,7 @@ pub fn add_import<'a>(
     {
         return None;
     }
+    // Don't add import if it already exists
     if find_import_declaration_node(ts_file, import_package_scope, import_class).is_some() {
         return None;
     }

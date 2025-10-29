@@ -21,15 +21,19 @@ struct ProcessedFieldConfig {
     pub should_add_lob_annotation: bool,
 }
 
-fn add_to_import_map(hashmap: &mut HashMap<String, String>, class_name: &str, package_name: &str) {
-    if !hashmap.contains_key(class_name) {
-        hashmap.insert(class_name.to_string(), package_name.to_string());
+fn add_to_import_map(
+    import_map: &mut HashMap<String, String>,
+    package_name: &str,
+    class_name: &str,
+) {
+    if !import_map.contains_key(class_name) {
+        import_map.insert(class_name.to_string(), package_name.to_string());
     }
 }
 
 fn add_imports(ts_file: &mut TSFile, import_map: &HashMap<String, String>) {
     let import_position = ImportInsertionPosition::AfterLastImport;
-    for (package_name, class_name) in import_map {
+    for (class_name, package_name) in import_map {
         add_import(ts_file, &import_position, package_name, class_name);
     }
 }
