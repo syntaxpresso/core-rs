@@ -171,24 +171,72 @@ fn add_field_and_annotations(
     Ok(())
 }
 
+fn step_process_field_config(field_config: &BasicFieldConfig) -> ProcessedFieldConfig {
+    process_field_config(field_config)
+}
+
+fn step_parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
+    TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
+}
+
+fn step_process_imports(
+    import_map: &mut HashMap<String, String>,
+    processed_field_config: &ProcessedFieldConfig,
+) {
+    process_imports(import_map, processed_field_config);
+}
+
+fn step_add_field_and_annotations(
+    ts_file: &mut TSFile,
+    field_config: &BasicFieldConfig,
+    processed_field_config: &ProcessedFieldConfig,
+) -> Result<(), String> {
+    add_field_and_annotations(ts_file, field_config, processed_field_config)
+}
+
+fn step_add_imports(ts_file: &mut TSFile, import_map: &HashMap<String, String>) {
+    add_imports(ts_file, import_map);
+}
+
+fn step_save_file(ts_file: &mut TSFile) -> Result<(), String> {
+    ts_file
+        .save()
+        .map_err(|e| format!("Unable to save JPA Entity file: {}", e))
+}
+
+fn step_build_file_response(ts_file: &TSFile) -> FileResponse {
+    let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
+    let file_path = ts_file
+        .file_path()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    // Try to get package name from the file, fallback to empty string
+    let file_package_name = "".to_string();
+    FileResponse {
+        file_type,
+        file_package_name,
+        file_path,
+    }
+}
+
 pub fn run(
     _cwd: &Path,
     entity_file_path: &Path,
     field_config: BasicFieldConfig,
 ) -> Result<FileResponse, String> {
+    // Step 1: Process field config
+    let processed_field_config = step_process_field_config(&field_config);
+    // Step 2: Parse entity file
+    let mut entity_ts_file = step_parse_entity_file(entity_file_path)?;
+    // Step 3: Process imports
     let mut import_map: HashMap<String, String> = HashMap::new();
-    let processed_field_config = process_field_config(&field_config);
-    let mut entity_ts_file = TSFile::from_file(entity_file_path)
-        .map_err(|_| "Unable to parse JPA Entity file".to_string())?;
-    process_imports(&mut import_map, &processed_field_config);
-    add_field_and_annotations(&mut entity_ts_file, &field_config, &processed_field_config)?;
-    add_imports(&mut entity_ts_file, &import_map);
-    entity_ts_file
-        .save()
-        .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
-    Ok(FileResponse {
-        file_type: "oi".to_string(),
-        file_package_name: "oi".to_string(),
-        file_path: "oi".to_string(),
-    })
+    step_process_imports(&mut import_map, &processed_field_config);
+    // Step 4: Add field and annotations
+    step_add_field_and_annotations(&mut entity_ts_file, &field_config, &processed_field_config)?;
+    // Step 5: Add imports
+    step_add_imports(&mut entity_ts_file, &import_map);
+    // Step 6: Save file
+    step_save_file(&mut entity_ts_file)?;
+    // Step 7: Build and return response
+    Ok(step_build_file_response(&entity_ts_file))
 }
