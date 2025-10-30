@@ -148,6 +148,16 @@ fn add_field_and_annotations(
             "name",
             &format!("\"{}\"", &column_name_snake_case),
         )?;
+        if field_config.field_unique {
+            builder.with_argument("@Column", "unique", "true")?;
+        } else {
+            builder.with_argument("@Column", "unique", "false")?;
+        }
+        if field_config.field_nullable {
+            builder.with_argument("@Column", "nullable", "true")?;
+        } else {
+            builder.with_argument("@Column", "nullable", "false")?;
+        }
         if processed_field_config.should_add_timezone_storage_annotation
             && timezone_storage_type.ne(&JavaFieldTimeZoneStorage::Auto)
         {

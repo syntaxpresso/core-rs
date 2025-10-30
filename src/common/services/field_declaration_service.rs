@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 
-use crate::common::services::annotation_service::{
-    add_annotation, add_annotation_argument, add_annotation_single_value,
-};
+use crate::common::services::annotation_service::add_annotation;
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_types::AnnotationInsertionPosition;
 use crate::common::types::field_types::{FieldInsertionPoint, FieldInsertionPosition};
@@ -22,6 +20,12 @@ pub struct AddFieldDeclarationParams<'a> {
 pub struct FieldAnnotationBuilder<'a> {
     ts_file: &'a mut TSFile,
     field_start_byte: usize,
+    pending_annotations: Vec<PendingAnnotation>,
+}
+
+struct PendingAnnotation {
+    annotation_text: String,
+    arguments: Vec<(String, String)>,
 }
 
 impl<'a> FieldAnnotationBuilder<'a> {
@@ -29,21 +33,15 @@ impl<'a> FieldAnnotationBuilder<'a> {
         Self {
             ts_file,
             field_start_byte,
+            pending_annotations: Vec::new(),
         }
     }
 
     pub fn add_annotation(&mut self, annotation_text: &str) -> Result<&mut Self, String> {
-        // Find the actual field_declaration node from the byte position
-        let field_node = self
-            .find_field_declaration_node()
-            .ok_or("Failed to find field declaration node")?;
-        add_annotation(
-            self.ts_file,
-            field_node.start_byte(),
-            &AnnotationInsertionPosition::AboveScopeDeclaration,
-            annotation_text,
-        )
-        .ok_or_else(|| format!("Failed to add annotation: {}", annotation_text))?;
+        self.pending_annotations.push(PendingAnnotation {
+            annotation_text: annotation_text.to_string(),
+            arguments: Vec::new(),
+        });
         Ok(self)
     }
 
@@ -72,70 +70,72 @@ impl<'a> FieldAnnotationBuilder<'a> {
         key: &str,
         value: &str,
     ) -> Result<&mut Self, String> {
-        // Find the actual field_declaration node first
-        let field_node = self
-            .find_field_declaration_node()
-            .ok_or("Failed to find field declaration node")?;
-        // Search for the annotation within the field's scope
-        let annotation_nodes =
-            crate::common::services::annotation_service::get_all_annotation_nodes(
-                self.ts_file,
-                field_node,
-            );
-        // Find the specific annotation by checking its text
-        let target_annotation = annotation_nodes
-            .iter()
-            .find(|node| {
-                if let Some(text) = self.ts_file.get_text_from_node(node) {
-                    text.contains(annotation_text)
-                } else {
-                    false
-                }
-            })
-            .ok_or_else(|| format!("Failed to find annotation: {}", annotation_text))?;
-        add_annotation_argument(self.ts_file, target_annotation.start_byte(), key, value)
-            .ok_or_else(|| {
-                format!(
-                    "Failed to add argument {}={} to annotation {}",
-                    key, value, annotation_text
-                )
-            })?;
+        // Find the pending annotation and add the argument to it
+        let pending_annotation = self
+            .pending_annotations
+            .iter_mut()
+            .find(|pa| pa.annotation_text == annotation_text)
+            .ok_or_else(|| format!("No pending annotation found for: {}", annotation_text))?;
+
+        pending_annotation
+            .arguments
+            .push((key.to_string(), value.to_string()));
         Ok(self)
     }
 
     pub fn with_value(&mut self, annotation_text: &str, value: &str) -> Result<&mut Self, String> {
-        // Find the actual field_declaration node first
+        // Find the pending annotation and add the single value to it
+        let pending_annotation = self
+            .pending_annotations
+            .iter_mut()
+            .find(|pa| pa.annotation_text == annotation_text)
+            .ok_or_else(|| format!("No pending annotation found for: {}", annotation_text))?;
+        // For single value annotations, we store it as a special argument
+        pending_annotation
+            .arguments
+            .push(("__single_value__".to_string(), value.to_string()));
+        Ok(self)
+    }
+
+    pub fn build(&mut self) -> Result<(), String> {
+        // Find the actual field_declaration node from the byte position
         let field_node = self
             .find_field_declaration_node()
             .ok_or("Failed to find field declaration node")?;
-        // Search for the annotation within the field's scope
-        let annotation_nodes =
-            crate::common::services::annotation_service::get_all_annotation_nodes(
-                self.ts_file,
-                field_node,
-            );
-        // Find the specific annotation by checking its text
-        let target_annotation = annotation_nodes
-            .iter()
-            .find(|node| {
-                if let Some(text) = self.ts_file.get_text_from_node(node) {
-                    text.contains(annotation_text)
+        let field_start_byte = field_node.start_byte();
+        // Process each pending annotation
+        for pending_annotation in &self.pending_annotations {
+            // Build the complete annotation text with all arguments
+            let mut annotation_text = pending_annotation.annotation_text.clone();
+            if !pending_annotation.arguments.is_empty() {
+                // Check if this is a single value annotation
+                if pending_annotation.arguments.len() == 1
+                    && pending_annotation.arguments[0].0 == "__single_value__"
+                {
+                    let value = &pending_annotation.arguments[0].1;
+                    annotation_text = format!("{}({})", annotation_text, value);
                 } else {
-                    false
+                    let args_str = pending_annotation
+                        .arguments
+                        .iter()
+                        .filter(|(key, _)| key != "__single_value__")
+                        .map(|(key, value)| format!("{} = {}", key, value))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    annotation_text = format!("{}({})", annotation_text, args_str);
                 }
-            })
-            .ok_or_else(|| format!("Failed to find annotation: {}", annotation_text))?;
-        add_annotation_single_value(self.ts_file, target_annotation.start_byte(), value)
-            .ok_or_else(|| {
-                format!(
-                    "Failed to add single value {} to annotation {}",
-                    value, annotation_text
-                )
-            })?;
-
-        Ok(self)
-    }
-    pub fn build(&mut self) -> Result<(), String> {
+            }
+            // Add the complete annotation to the tree
+            add_annotation(
+                self.ts_file,
+                field_start_byte,
+                &AnnotationInsertionPosition::AboveScopeDeclaration,
+                &annotation_text,
+            )
+            .ok_or_else(|| format!("Failed to add annotation: {}", annotation_text))?;
+        }
+        // Clear pending annotations after building
+        self.pending_annotations.clear();
         Ok(())
     }
 }
