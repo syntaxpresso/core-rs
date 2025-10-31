@@ -1,6 +1,7 @@
 pub mod create_java_file_command;
 pub mod create_jpa_entity_basic_field_command;
 pub mod create_jpa_entity_command;
+pub mod create_jpa_entity_id_field_command;
 pub mod create_jpa_repository_command;
 pub mod get_all_files_command;
 pub mod get_jpa_entity_info_command;
@@ -18,8 +19,10 @@ use crate::{
         package_name_validator::validate_package_name,
     },
     common::types::{
-        basic_field_config::BasicFieldConfig, java_field_temporal::JavaFieldTemporal,
+        basic_field_config::BasicFieldConfig, id_field_config::IdFieldConfig,
+        java_field_temporal::JavaFieldTemporal,
         java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
+        java_id_generation::JavaIdGeneration, java_id_generation_type::JavaIdGenerationType,
         java_source_directory_type::JavaSourceDirectoryType,
     },
 };
@@ -116,6 +119,46 @@ pub enum Commands {
         #[arg(long)]
         field_large_object: bool,
     },
+    CreateJPAEntityIdField {
+        #[arg(long, value_parser = validate_directory, required = true)]
+        cwd: PathBuf,
+
+        #[arg(long, required = true)]
+        entity_file_path: PathBuf,
+
+        #[arg(long, required = true)]
+        field_name: String,
+
+        #[arg(long, required = true)]
+        field_type: String,
+
+        #[arg(long, required = false)]
+        field_type_package_name: Option<String>,
+
+        #[arg(long, required = true)]
+        field_id_generation: JavaIdGeneration,
+
+        #[arg(long, required = false)]
+        field_id_generation_type: Option<JavaIdGenerationType>,
+
+        #[arg(long, required = false)]
+        field_generator_name: Option<String>,
+
+        #[arg(long, required = false)]
+        field_sequence_name: Option<String>,
+
+        #[arg(long, required = false)]
+        field_initial_value: Option<i64>,
+
+        #[arg(long, required = false)]
+        field_allocation_size: Option<i64>,
+
+        #[arg(long)]
+        field_nullable: bool,
+
+        #[arg(long)]
+        field_mutable: bool,
+    },
 }
 
 impl Commands {
@@ -203,6 +246,41 @@ impl Commands {
                     field_large_object: *field_large_object,
                 };
                 let response = create_jpa_entity_basic_field_command::execute(
+                    cwd.as_path(),
+                    entity_file_path.as_path(),
+                    field_config,
+                );
+                response.to_json_pretty().map_err(|e| e.into())
+            }
+            Commands::CreateJPAEntityIdField {
+                cwd,
+                entity_file_path,
+                field_name,
+                field_type,
+                field_type_package_name,
+                field_id_generation,
+                field_id_generation_type,
+                field_generator_name,
+                field_sequence_name,
+                field_initial_value,
+                field_allocation_size,
+                field_nullable,
+                field_mutable,
+            } => {
+                let field_config = IdFieldConfig {
+                    field_name: field_name.clone(),
+                    field_type: field_type.clone(),
+                    field_type_package_name: field_type_package_name.clone(),
+                    field_id_generation: field_id_generation.clone(),
+                    field_id_generation_type: field_id_generation_type.clone(),
+                    field_generator_name: field_generator_name.clone(),
+                    field_sequence_name: field_sequence_name.clone(),
+                    field_initial_value: *field_initial_value,
+                    field_allocation_size: *field_allocation_size,
+                    field_nullable: *field_nullable,
+                    field_mutable: *field_mutable,
+                };
+                let response = create_jpa_entity_id_field_command::execute(
                     cwd.as_path(),
                     entity_file_path.as_path(),
                     field_config,
