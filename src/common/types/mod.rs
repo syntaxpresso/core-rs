@@ -6,5 +6,9 @@ pub mod java_field_modifier;
 pub mod java_field_temporal;
 pub mod java_field_time_zone_storage;
 pub mod java_file_type;
+pub mod java_id_generation;
+pub mod java_id_generation_type;
 pub mod java_source_directory_type;
 pub mod java_visibility_modifier;
+pub mod id_field_config;
+
