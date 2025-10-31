@@ -227,7 +227,7 @@ pub fn run(
     let mut import_map: HashMap<String, String> = HashMap::new();
     process_imports(&mut import_map, &processed_field_config);
     // Step 4: Add field and annotations
-    add_field_and_annotations(&mut entity_ts_file, &field_config, &processed_field_config)?;
+    add_field_and_annotations(&mut entity_ts_file, field_config, &processed_field_config)?;
     // Step 5: Add imports
     add_imports(&mut entity_ts_file, &import_map);
     // Step 6: Save file
