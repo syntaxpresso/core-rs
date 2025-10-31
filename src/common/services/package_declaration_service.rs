@@ -19,9 +19,9 @@ use tree_sitter::Node;
 /// // Returns the entire package_declaration node
 /// ```
 pub fn get_package_declaration_node(ts_file: &TSFile) -> Option<Node<'_>> {
-    ts_file.tree.as_ref()?;
-    let query_string = "(package_declaration) @package";
-    ts_file.query_builder(query_string).returning("package").first_node().ok().flatten()
+  ts_file.tree.as_ref()?;
+  let query_string = "(package_declaration) @package";
+  ts_file.query_builder(query_string).returning("package").first_node().ok().flatten()
 }
 
 /// Extracts the rightmost part (class name) from a package declaration.
@@ -47,23 +47,23 @@ pub fn get_package_declaration_node(ts_file: &TSFile) -> Option<Node<'_>> {
 /// # Expected Result
 /// Returns the rightmost identifier from the package declaration (e.g., "myapp" from "com.example.myapp")
 pub fn get_package_class_name_node<'a>(
-    ts_file: &'a TSFile,
-    package_declaration_node: Node<'a>,
+  ts_file: &'a TSFile,
+  package_declaration_node: Node<'a>,
 ) -> Option<Node<'a>> {
-    let query_string = r#"
+  let query_string = r#"
         (package_declaration
           (scoped_identifier
             name: (_) @class_name
           )
         )
     "#;
-    ts_file
-        .query_builder(query_string)
-        .within(package_declaration_node)
-        .returning("class_name")
-        .first_node()
-        .ok()
-        .flatten()
+  ts_file
+    .query_builder(query_string)
+    .within(package_declaration_node)
+    .returning("class_name")
+    .first_node()
+    .ok()
+    .flatten()
 }
 
 /// Extracts the scope part (everything except the rightmost component) from a package declaration.
@@ -88,23 +88,23 @@ pub fn get_package_class_name_node<'a>(
 /// # Expected Result
 /// Returns everything except the rightmost identifier (e.g., "com.example" from "com.example.myapp")
 pub fn get_package_class_scope_node<'a>(
-    ts_file: &'a TSFile,
-    package_declaration_node: Node<'a>,
+  ts_file: &'a TSFile,
+  package_declaration_node: Node<'a>,
 ) -> Option<Node<'a>> {
-    let query_string = r#"
+  let query_string = r#"
         (package_declaration
           (scoped_identifier
             scope: (_) @class_scope
           )
         )
     "#;
-    ts_file
-        .query_builder(query_string)
-        .within(package_declaration_node)
-        .returning("class_scope")
-        .first_node()
-        .ok()
-        .flatten()
+  ts_file
+    .query_builder(query_string)
+    .within(package_declaration_node)
+    .returning("class_scope")
+    .first_node()
+    .ok()
+    .flatten()
 }
 
 /// Extracts the complete scoped identifier node from a package declaration.
@@ -129,19 +129,19 @@ pub fn get_package_class_scope_node<'a>(
 /// # Expected Result
 /// Returns the complete dotted package identifier (e.g., "com.example.myapp")
 pub fn get_package_scope_node<'a>(
-    ts_file: &'a TSFile,
-    package_declaration_node: Node<'a>,
+  ts_file: &'a TSFile,
+  package_declaration_node: Node<'a>,
 ) -> Option<Node<'a>> {
-    let query_string = r#"
+  let query_string = r#"
         (package_declaration
           (scoped_identifier) @package_scope
         )
     "#;
-    ts_file
-        .query_builder(query_string)
-        .within(package_declaration_node)
-        .returning("package_scope")
-        .first_node()
-        .ok()
-        .flatten()
+  ts_file
+    .query_builder(query_string)
+    .within(package_declaration_node)
+    .returning("package_scope")
+    .first_node()
+    .ok()
+    .flatten()
 }
