@@ -2,32 +2,32 @@
 
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_types::{
-    AnnotationInsertionPoint, AnnotationInsertionPosition,
+  AnnotationInsertionPoint, AnnotationInsertionPosition,
 };
 use tree_sitter::Node;
 
 impl Default for AnnotationInsertionPoint {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl AnnotationInsertionPoint {
-    fn new() -> Self {
-        Self {
-            position: AnnotationInsertionPosition::BeforeFirstAnnotation,
-            insert_byte: 0,
-            break_line_before: false,
-            break_line_after: false,
-        }
+  fn new() -> Self {
+    Self {
+      position: AnnotationInsertionPosition::BeforeFirstAnnotation,
+      insert_byte: 0,
+      break_line_before: false,
+      break_line_after: false,
     }
+  }
 }
 
 pub fn get_all_annotation_nodes<'a>(ts_file: &'a TSFile, scope_node: Node<'a>) -> Vec<Node<'a>> {
-    if ts_file.tree.is_none() {
-        return Vec::new();
-    }
-    let query_string = r#"
+  if ts_file.tree.is_none() {
+    return Vec::new();
+  }
+  let query_string = r#"
         (
           [
             (annotation) @annotation
@@ -35,19 +35,15 @@ pub fn get_all_annotation_nodes<'a>(ts_file: &'a TSFile, scope_node: Node<'a>) -
           ]
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .execute()
-    {
-        Ok(result) => result.nodes(),
-        Err(_) => Vec::new(),
-    }
+  match ts_file.query_builder(query_string).within(scope_node).execute() {
+    Ok(result) => result.nodes(),
+    Err(_) => Vec::new(),
+  }
 }
 
 pub fn get_annotation_name_node<'a>(ts_file: &'a TSFile, scope_node: Node<'a>) -> Option<Node<'a>> {
-    ts_file.tree.as_ref()?;
-    let query_string = r#"
+  ts_file.tree.as_ref()?;
+  let query_string = r#"
         [
           (annotation
             name: (identifier) @annotationName
@@ -57,25 +53,25 @@ pub fn get_annotation_name_node<'a>(ts_file: &'a TSFile, scope_node: Node<'a>) -
           )
         ]
     "#;
-    ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("annotationName")
-        .execute()
-        .ok()?
-        .first_node()
+  ts_file
+    .query_builder(query_string)
+    .within(scope_node)
+    .returning("annotationName")
+    .execute()
+    .ok()?
+    .first_node()
 }
 
 pub fn find_annotation_node_by_name<'a>(
-    ts_file: &'a TSFile,
-    scope_node: Node<'a>,
-    annotation_name: &str,
+  ts_file: &'a TSFile,
+  scope_node: Node<'a>,
+  annotation_name: &str,
 ) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || annotation_name.trim().is_empty() {
-        return None;
-    }
-    let query_string = format!(
-        r#"
+  if ts_file.tree.is_none() || annotation_name.trim().is_empty() {
+    return None;
+  }
+  let query_string = format!(
+    r#"
         (
           [
             (annotation name: (identifier) @name)
@@ -84,50 +80,45 @@ pub fn find_annotation_node_by_name<'a>(
           (#eq? @name "{}")
         )
         "#,
-        annotation_name
-    );
-    ts_file
-        .query_builder(&query_string)
-        .within(scope_node)
-        .returning("node")
-        .execute()
-        .ok()?
-        .first_node()
+    annotation_name
+  );
+  ts_file
+    .query_builder(&query_string)
+    .within(scope_node)
+    .returning("node")
+    .execute()
+    .ok()?
+    .first_node()
 }
 
 pub fn get_annotation_argument_pair_nodes<'a>(
-    ts_file: &'a TSFile,
-    scope_node: Node<'a>,
+  ts_file: &'a TSFile,
+  scope_node: Node<'a>,
 ) -> Vec<Node<'a>> {
-    if ts_file.tree.is_none() {
-        return Vec::new();
-    }
-    let query_string = r#"
+  if ts_file.tree.is_none() {
+    return Vec::new();
+  }
+  let query_string = r#"
         (
           (annotation_argument_list
             (element_value_pair) @pair
           )
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("pair")
-        .execute()
-    {
-        Ok(result) => result.nodes(),
-        Err(_) => Vec::new(),
-    }
+  match ts_file.query_builder(query_string).within(scope_node).returning("pair").execute() {
+    Ok(result) => result.nodes(),
+    Err(_) => Vec::new(),
+  }
 }
 
 pub fn get_annotation_argument_key_nodes<'a>(
-    ts_file: &'a TSFile,
-    scope_node: Node<'a>,
+  ts_file: &'a TSFile,
+  scope_node: Node<'a>,
 ) -> Vec<Node<'a>> {
-    if ts_file.tree.is_none() {
-        return Vec::new();
-    }
-    let query_string = r#"
+  if ts_file.tree.is_none() {
+    return Vec::new();
+  }
+  let query_string = r#"
         (
           (annotation_argument_list
             (element_value_pair
@@ -136,25 +127,20 @@ pub fn get_annotation_argument_key_nodes<'a>(
           )
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("key")
-        .execute()
-    {
-        Ok(result) => result.nodes(),
-        Err(_) => Vec::new(),
-    }
+  match ts_file.query_builder(query_string).within(scope_node).returning("key").execute() {
+    Ok(result) => result.nodes(),
+    Err(_) => Vec::new(),
+  }
 }
 
 pub fn get_annotation_argument_value_nodes<'a>(
-    ts_file: &'a TSFile,
-    scope_node: Node<'a>,
+  ts_file: &'a TSFile,
+  scope_node: Node<'a>,
 ) -> Vec<Node<'a>> {
-    if ts_file.tree.is_none() {
-        return Vec::new();
-    }
-    let query_string = r#"
+  if ts_file.tree.is_none() {
+    return Vec::new();
+  }
+  let query_string = r#"
         (
           (annotation_argument_list
             (element_value_pair
@@ -163,27 +149,22 @@ pub fn get_annotation_argument_value_nodes<'a>(
           )
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("value")
-        .execute()
-    {
-        Ok(result) => result.nodes(),
-        Err(_) => Vec::new(),
-    }
+  match ts_file.query_builder(query_string).within(scope_node).returning("value").execute() {
+    Ok(result) => result.nodes(),
+    Err(_) => Vec::new(),
+  }
 }
 
 pub fn find_annotation_value_node_by_key<'a>(
-    ts_file: &'a TSFile,
-    scope_node: Node<'a>,
-    key: &str,
+  ts_file: &'a TSFile,
+  scope_node: Node<'a>,
+  key: &str,
 ) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || key.trim().is_empty() {
-        return None;
-    }
-    let query_string = format!(
-        r#"
+  if ts_file.tree.is_none() || key.trim().is_empty() {
+    return None;
+  }
+  let query_string = format!(
+    r#"
         (
           (annotation_argument_list
             (element_value_pair
@@ -194,363 +175,337 @@ pub fn find_annotation_value_node_by_key<'a>(
           (#eq? @key "{}")
         )
         "#,
-        key
-    );
-    ts_file
-        .query_builder(&query_string)
-        .within(scope_node)
-        .returning("value")
-        .execute()
-        .ok()?
-        .first_node()
+    key
+  );
+  ts_file
+    .query_builder(&query_string)
+    .within(scope_node)
+    .returning("value")
+    .execute()
+    .ok()?
+    .first_node()
 }
 
 fn detect_indentation(
-    ts_file: &TSFile,
-    declaration_node: Node,
-    all_annotations: &[Node],
+  ts_file: &TSFile,
+  declaration_node: Node,
+  all_annotations: &[Node],
 ) -> String {
-    // If there are existing annotations, use their indentation
-    if let Some(first_annotation) = all_annotations.first() {
-        let full_text = &ts_file.source_code;
-        let annotation_start = first_annotation.start_byte();
-        // Find the start of the line containing this annotation
-        let line_start = full_text[..annotation_start]
-            .rfind('\n')
-            .map(|pos| pos + 1)
-            .unwrap_or(0);
-        // Extract indentation (spaces/tabs before the annotation)
-        if let Some(line_text) = full_text.get(line_start..annotation_start) {
-            return line_text.to_string();
-        }
-    }
-    // If no existing annotations, analyze the declaration line itself
+  // If there are existing annotations, use their indentation
+  if let Some(first_annotation) = all_annotations.first() {
     let full_text = &ts_file.source_code;
-    let decl_start = declaration_node.start_byte();
-    // Find the start of the line containing this declaration
-    let line_start = full_text[..decl_start]
-        .rfind('\n')
-        .map(|pos| pos + 1)
-        .unwrap_or(0);
-    // Extract indentation from the declaration line
-    if let Some(line_text) = full_text.get(line_start..decl_start) {
-        return line_text.to_string();
+    let annotation_start = first_annotation.start_byte();
+    // Find the start of the line containing this annotation
+    let line_start = full_text[..annotation_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
+    // Extract indentation (spaces/tabs before the annotation)
+    if let Some(line_text) = full_text.get(line_start..annotation_start) {
+      return line_text.to_string();
     }
-    // Fallback: use 2 spaces (common Java indentation for field annotations)
-    "  ".to_string()
+  }
+  // If no existing annotations, analyze the declaration line itself
+  let full_text = &ts_file.source_code;
+  let decl_start = declaration_node.start_byte();
+  // Find the start of the line containing this declaration
+  let line_start = full_text[..decl_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
+  // Extract indentation from the declaration line
+  if let Some(line_text) = full_text.get(line_start..decl_start) {
+    return line_text.to_string();
+  }
+  // Fallback: use 2 spaces (common Java indentation for field annotations)
+  "  ".to_string()
 }
 
 pub fn add_annotation<'a>(
-    ts_file: &'a mut TSFile,
-    declaration_byte_position: usize,
-    insertion_position: &AnnotationInsertionPosition,
-    annotation_text: &str,
+  ts_file: &'a mut TSFile,
+  declaration_byte_position: usize,
+  insertion_position: &AnnotationInsertionPosition,
+  annotation_text: &str,
 ) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || annotation_text.trim().is_empty() {
-        return None;
+  if ts_file.tree.is_none() || annotation_text.trim().is_empty() {
+    return None;
+  }
+  // Collect all necessary information before any mutable operations
+  let (
+    declaration_start_byte,
+    declaration_end_byte,
+    _node_kind,
+    current_text,
+    all_annotations,
+    indentation,
+  ) = {
+    // Find the declaration node at the given byte position
+    let mut declaration_node = ts_file.get_named_node_at_byte_position(declaration_byte_position);
+    declaration_node.as_ref()?;
+    let mut current_node = declaration_node.unwrap();
+    let mut node_kind = current_node.kind();
+    // If we found a modifiers node, look for the parent declaration
+    if node_kind == "modifiers"
+      && let Some(parent) = current_node.parent()
+      && matches!(
+        parent.kind(),
+        "class_declaration" | "field_declaration" | "method_declaration" | "interface_declaration"
+      )
+    {
+      current_node = parent;
+      node_kind = current_node.kind();
     }
-    // Collect all necessary information before any mutable operations
-    let (
-        declaration_start_byte,
-        declaration_end_byte,
-        _node_kind,
-        current_text,
-        all_annotations,
-        indentation,
-    ) = {
-        // Find the declaration node at the given byte position
-        let mut declaration_node =
-            ts_file.get_named_node_at_byte_position(declaration_byte_position);
-        declaration_node.as_ref()?;
-        let mut current_node = declaration_node.unwrap();
-        let mut node_kind = current_node.kind();
-        // If we found a modifiers node, look for the parent declaration
-        if node_kind == "modifiers"
-            && let Some(parent) = current_node.parent()
-            && matches!(
-                parent.kind(),
-                "class_declaration"
-                    | "field_declaration"
-                    | "method_declaration"
-                    | "interface_declaration"
-            )
-        {
-            current_node = parent;
-            node_kind = current_node.kind();
+    // If we found an annotation, navigate up to find the containing class_declaration
+    if matches!(node_kind, "annotation" | "marker_annotation") {
+      // The annotation is likely a child of modifiers, which is a child of class_declaration
+      // So we need to go up the parent chain to find class_declaration
+      let mut current_ancestor = Some(current_node);
+      while let Some(ancestor) = current_ancestor {
+        if ancestor.kind() == "class_declaration" {
+          current_node = ancestor;
+          node_kind = current_node.kind();
+          break;
         }
-        // If we found an annotation, navigate up to find the containing class_declaration
-        if matches!(node_kind, "annotation" | "marker_annotation") {
-            // The annotation is likely a child of modifiers, which is a child of class_declaration
-            // So we need to go up the parent chain to find class_declaration
-            let mut current_ancestor = Some(current_node);
-            while let Some(ancestor) = current_ancestor {
-                if ancestor.kind() == "class_declaration" {
-                    current_node = ancestor;
-                    node_kind = current_node.kind();
-                    break;
-                }
-                current_ancestor = ancestor.parent();
-            }
-        }
-        if !matches!(
-            node_kind,
-            "class_declaration"
-                | "field_declaration"
-                | "interface_declaration"
-                | "method_declaration"
-        ) {
-            return None;
-        }
-        declaration_node = Some(current_node);
-        let declaration_node = declaration_node.unwrap();
-        let all_annotations = get_all_annotation_nodes(ts_file, declaration_node);
-        let current_text = ts_file.get_text_from_node(&declaration_node);
-        current_text.as_ref()?;
-        let current_text = current_text.unwrap().to_string();
-        let indentation = detect_indentation(ts_file, declaration_node, &all_annotations);
+        current_ancestor = ancestor.parent();
+      }
+    }
+    if !matches!(
+      node_kind,
+      "class_declaration" | "field_declaration" | "interface_declaration" | "method_declaration"
+    ) {
+      return None;
+    }
+    declaration_node = Some(current_node);
+    let declaration_node = declaration_node.unwrap();
+    let all_annotations = get_all_annotation_nodes(ts_file, declaration_node);
+    let current_text = ts_file.get_text_from_node(&declaration_node);
+    current_text.as_ref()?;
+    let current_text = current_text.unwrap().to_string();
+    let indentation = detect_indentation(ts_file, declaration_node, &all_annotations);
 
-        // Adjust start byte to include indentation when there are no annotations
-        let actual_start_byte = if all_annotations.is_empty() {
-            // Find the actual start including leading whitespace
-            let decl_start = declaration_node.start_byte();
-            ts_file.source_code[..decl_start]
-                .rfind('\n')
-                .map(|pos| pos + 1)
-                .unwrap_or(0)
+    // Adjust start byte to include indentation when there are no annotations
+    let actual_start_byte = if all_annotations.is_empty() {
+      // Find the actual start including leading whitespace
+      let decl_start = declaration_node.start_byte();
+      ts_file.source_code[..decl_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0)
+    } else {
+      declaration_node.start_byte()
+    };
+    (
+      actual_start_byte,
+      declaration_node.end_byte(),
+      node_kind,
+      current_text,
+      all_annotations,
+      indentation,
+    )
+  };
+  let mut annotation_insertion_point = AnnotationInsertionPoint::new();
+  annotation_insertion_point.position = insertion_position.clone();
+  match insertion_position {
+    AnnotationInsertionPosition::BeforeFirstAnnotation => {
+      if !all_annotations.is_empty() {
+        annotation_insertion_point.break_line_after = true;
+        annotation_insertion_point.insert_byte = all_annotations[0].start_byte();
+      } else {
+        annotation_insertion_point.break_line_after = true;
+        annotation_insertion_point.insert_byte = declaration_start_byte;
+      }
+    }
+    AnnotationInsertionPosition::AboveScopeDeclaration => {
+      if all_annotations.is_empty() {
+        annotation_insertion_point.break_line_after = true;
+        annotation_insertion_point.insert_byte = declaration_start_byte;
+      } else {
+        annotation_insertion_point.break_line_before = true;
+        annotation_insertion_point.insert_byte = all_annotations.last()?.end_byte();
+      }
+    }
+  }
+  let new_content = match insertion_position {
+    AnnotationInsertionPosition::BeforeFirstAnnotation => {
+      if !all_annotations.is_empty() {
+        // Insert before first annotation
+        let first_annotation = &all_annotations[0];
+        let relative_pos = first_annotation.start_byte() - declaration_start_byte;
+        let before = &current_text[..relative_pos];
+        let after = &current_text[relative_pos..];
+
+        // If 'before' is empty (meaning first annotation has no indentation),
+        // use the detected indentation from field context
+        if before.trim().is_empty() && !indentation.is_empty() {
+          format!("{}{}\n{}", indentation, annotation_text, after)
+        } else if before.is_empty() {
+          // Fallback: use field-level indentation (2 spaces for fields)
+          format!("  {}\n{}", annotation_text, after)
         } else {
-            declaration_node.start_byte()
-        };
-        (
-            actual_start_byte,
-            declaration_node.end_byte(),
-            node_kind,
-            current_text,
-            all_annotations,
-            indentation,
-        )
-    };
-    let mut annotation_insertion_point = AnnotationInsertionPoint::new();
-    annotation_insertion_point.position = insertion_position.clone();
-    match insertion_position {
-        AnnotationInsertionPosition::BeforeFirstAnnotation => {
-            if !all_annotations.is_empty() {
-                annotation_insertion_point.break_line_after = true;
-                annotation_insertion_point.insert_byte = all_annotations[0].start_byte();
-            } else {
-                annotation_insertion_point.break_line_after = true;
-                annotation_insertion_point.insert_byte = declaration_start_byte;
-            }
+          // Use the existing indentation pattern
+          format!("{}{}\n{}", before, annotation_text, after)
         }
-        AnnotationInsertionPosition::AboveScopeDeclaration => {
-            if all_annotations.is_empty() {
-                annotation_insertion_point.break_line_after = true;
-                annotation_insertion_point.insert_byte = declaration_start_byte;
-            } else {
-                annotation_insertion_point.break_line_before = true;
-                annotation_insertion_point.insert_byte = all_annotations.last()?.end_byte();
-            }
-        }
+      } else {
+        // No annotations exist, insert at beginning
+        format!("{}{}\n{}", indentation, annotation_text, current_text)
+      }
     }
-    let new_content = match insertion_position {
-        AnnotationInsertionPosition::BeforeFirstAnnotation => {
-            if !all_annotations.is_empty() {
-                // Insert before first annotation
-                let first_annotation = &all_annotations[0];
-                let relative_pos = first_annotation.start_byte() - declaration_start_byte;
-                let before = &current_text[..relative_pos];
-                let after = &current_text[relative_pos..];
-
-                // If 'before' is empty (meaning first annotation has no indentation),
-                // use the detected indentation from field context
-                if before.trim().is_empty() && !indentation.is_empty() {
-                    format!("{}{}\n{}", indentation, annotation_text, after)
-                } else if before.is_empty() {
-                    // Fallback: use field-level indentation (2 spaces for fields)
-                    format!("  {}\n{}", annotation_text, after)
-                } else {
-                    // Use the existing indentation pattern
-                    format!("{}{}\n{}", before, annotation_text, after)
-                }
-            } else {
-                // No annotations exist, insert at beginning
-                format!("{}{}\n{}", indentation, annotation_text, current_text)
-            }
-        }
-        AnnotationInsertionPosition::AboveScopeDeclaration => {
-            if all_annotations.is_empty() {
-                // No annotations exist, insert at beginning
-                // Since we're now including the leading whitespace in the replacement range,
-                // we need to format the content with proper indentation for both annotation and field
-                format!(
-                    "{}{}\n{}{}",
-                    indentation, annotation_text, indentation, current_text
-                )
-            } else {
-                // Insert after last annotation
-                let last_annotation = all_annotations.last()?;
-                let relative_pos = last_annotation.end_byte() - declaration_start_byte;
-                let before = &current_text[..relative_pos];
-                let after = &current_text[relative_pos..];
-                format!("{}\n{}{}{}", before, indentation, annotation_text, after)
-            }
-        }
-    };
-    ts_file.replace_text_by_byte_range(declaration_start_byte, declaration_end_byte, &new_content)
+    AnnotationInsertionPosition::AboveScopeDeclaration => {
+      if all_annotations.is_empty() {
+        // No annotations exist, insert at beginning
+        // Since we're now including the leading whitespace in the replacement range,
+        // we need to format the content with proper indentation for both annotation and field
+        format!("{}{}\n{}{}", indentation, annotation_text, indentation, current_text)
+      } else {
+        // Insert after last annotation
+        let last_annotation = all_annotations.last()?;
+        let relative_pos = last_annotation.end_byte() - declaration_start_byte;
+        let before = &current_text[..relative_pos];
+        let after = &current_text[relative_pos..];
+        format!("{}\n{}{}{}", before, indentation, annotation_text, after)
+      }
+    }
+  };
+  ts_file.replace_text_by_byte_range(declaration_start_byte, declaration_end_byte, &new_content)
 }
 
 pub fn add_annotation_argument<'a>(
-    ts_file: &'a mut TSFile,
-    annotation_byte_position: usize,
-    key: &str,
-    value: &str,
+  ts_file: &'a mut TSFile,
+  annotation_byte_position: usize,
+  key: &str,
+  value: &str,
 ) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || key.trim().is_empty() || value.trim().is_empty() {
-        return None;
+  if ts_file.tree.is_none() || key.trim().is_empty() || value.trim().is_empty() {
+    return None;
+  }
+  // Collect all necessary information before any mutable operations
+  let (
+    annotation_start_byte,
+    annotation_end_byte,
+    node_kind,
+    current_text,
+    name_node_info,
+    existing_arguments,
+    actual_start_byte,
+  ) = {
+    // Find the annotation node at the given byte position
+    let annotation_node = ts_file.get_named_node_at_byte_position(annotation_byte_position)?;
+    let node_kind = annotation_node.kind();
+    if !matches!(node_kind, "annotation" | "marker_annotation") {
+      return None;
     }
-    // Collect all necessary information before any mutable operations
-    let (
-        annotation_start_byte,
-        annotation_end_byte,
-        node_kind,
-        current_text,
-        name_node_info,
-        existing_arguments,
-        actual_start_byte,
-    ) = {
-        // Find the annotation node at the given byte position
-        let annotation_node = ts_file.get_named_node_at_byte_position(annotation_byte_position)?;
-        let node_kind = annotation_node.kind();
-        if !matches!(node_kind, "annotation" | "marker_annotation") {
-            return None;
-        }
-        // Get annotation text including any leading whitespace on the same line
-        let source_text = &ts_file.source_code;
-        let annotation_start = annotation_node.start_byte();
-        // Find the start of the line containing this annotation
-        let line_start = source_text[..annotation_start]
-            .rfind('\n')
-            .map(|pos| pos + 1)
-            .unwrap_or(0);
-        // Check if there's only whitespace between line start and annotation
-        let leading_text = &source_text[line_start..annotation_start];
-        let annotation_only_text = ts_file.get_text_from_node(&annotation_node)?.to_string();
-        let (current_text, actual_start_byte, name_offset) = if leading_text.trim().is_empty() {
-            // Include leading whitespace in the text and extend the range
-            let whitespace_len = leading_text.len();
-            (
-                format!("{}{}", leading_text, annotation_only_text),
-                line_start,
-                whitespace_len,
-            )
-        } else {
-            // Annotation is not at the start of the line, use original approach
-            (annotation_only_text, annotation_start, 0)
-        };
-        let name_node_info = get_annotation_name_node(ts_file, annotation_node)
-            .map(|n| n.end_byte() - annotation_start + name_offset);
-        let existing_arguments = get_annotation_argument_pair_nodes(ts_file, annotation_node);
-        (
-            annotation_node.start_byte(),
-            annotation_node.end_byte(),
-            node_kind,
-            current_text,
-            name_node_info,
-            existing_arguments,
-            actual_start_byte,
-        )
-    };
-    let argument_pair = format!("{} = {}", key, value);
-    let new_content = if node_kind == "marker_annotation" {
-        // Convert marker annotation to annotation with arguments
-        // @Test -> @Test(key = value)
-        let name_end_pos = name_node_info?;
-        let before = &current_text[..name_end_pos];
-        let after = &current_text[name_end_pos..];
-        format!("{}({}){}", before, argument_pair, after)
+    // Get annotation text including any leading whitespace on the same line
+    let source_text = &ts_file.source_code;
+    let annotation_start = annotation_node.start_byte();
+    // Find the start of the line containing this annotation
+    let line_start = source_text[..annotation_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
+    // Check if there's only whitespace between line start and annotation
+    let leading_text = &source_text[line_start..annotation_start];
+    let annotation_only_text = ts_file.get_text_from_node(&annotation_node)?.to_string();
+    let (current_text, actual_start_byte, name_offset) = if leading_text.trim().is_empty() {
+      // Include leading whitespace in the text and extend the range
+      let whitespace_len = leading_text.len();
+      (format!("{}{}", leading_text, annotation_only_text), line_start, whitespace_len)
     } else {
-        // Add argument to existing annotation
-        if existing_arguments.is_empty() {
-            // No existing arguments, add first one
-            // @Column -> @Column(key = value)
-            let name_end_pos = name_node_info?;
-            let before = &current_text[..name_end_pos];
-            let after = &current_text[name_end_pos..];
-            format!("{}({}){}", before, argument_pair, after)
-        } else {
-            // Add argument to existing arguments
-            // @Column(name = "test") -> @Column(name = "test", key = value)
-            let last_argument = existing_arguments.last()?;
-            let insert_pos = last_argument.end_byte() - annotation_start_byte;
-            let before = &current_text[..insert_pos];
-            let after = &current_text[insert_pos..];
-            format!("{}, {}{}", before, argument_pair, after)
-        }
+      // Annotation is not at the start of the line, use original approach
+      (annotation_only_text, annotation_start, 0)
     };
-    ts_file.replace_text_by_byte_range(actual_start_byte, annotation_end_byte, &new_content)
+    let name_node_info = get_annotation_name_node(ts_file, annotation_node)
+      .map(|n| n.end_byte() - annotation_start + name_offset);
+    let existing_arguments = get_annotation_argument_pair_nodes(ts_file, annotation_node);
+    (
+      annotation_node.start_byte(),
+      annotation_node.end_byte(),
+      node_kind,
+      current_text,
+      name_node_info,
+      existing_arguments,
+      actual_start_byte,
+    )
+  };
+  let argument_pair = format!("{} = {}", key, value);
+  let new_content = if node_kind == "marker_annotation" {
+    // Convert marker annotation to annotation with arguments
+    // @Test -> @Test(key = value)
+    let name_end_pos = name_node_info?;
+    let before = &current_text[..name_end_pos];
+    let after = &current_text[name_end_pos..];
+    format!("{}({}){}", before, argument_pair, after)
+  } else {
+    // Add argument to existing annotation
+    if existing_arguments.is_empty() {
+      // No existing arguments, add first one
+      // @Column -> @Column(key = value)
+      let name_end_pos = name_node_info?;
+      let before = &current_text[..name_end_pos];
+      let after = &current_text[name_end_pos..];
+      format!("{}({}){}", before, argument_pair, after)
+    } else {
+      // Add argument to existing arguments
+      // @Column(name = "test") -> @Column(name = "test", key = value)
+      let last_argument = existing_arguments.last()?;
+      let insert_pos = last_argument.end_byte() - annotation_start_byte;
+      let before = &current_text[..insert_pos];
+      let after = &current_text[insert_pos..];
+      format!("{}, {}{}", before, argument_pair, after)
+    }
+  };
+  ts_file.replace_text_by_byte_range(actual_start_byte, annotation_end_byte, &new_content)
 }
 
 pub fn add_annotation_single_value<'a>(
-    ts_file: &'a mut TSFile,
-    annotation_byte_position: usize,
-    value: &str,
+  ts_file: &'a mut TSFile,
+  annotation_byte_position: usize,
+  value: &str,
 ) -> Option<Node<'a>> {
-    if ts_file.tree.is_none() || value.trim().is_empty() {
-        return None;
+  if ts_file.tree.is_none() || value.trim().is_empty() {
+    return None;
+  }
+  // Collect all necessary information before any mutable operations
+  let (
+    annotation_start_byte,
+    annotation_end_byte,
+    node_kind,
+    current_text,
+    name_node_info,
+    existing_arguments,
+  ) = {
+    // Find the annotation node at the given byte position
+    let annotation_node = ts_file.get_named_node_at_byte_position(annotation_byte_position)?;
+    let node_kind = annotation_node.kind();
+    if !matches!(node_kind, "annotation" | "marker_annotation") {
+      return None;
     }
-    // Collect all necessary information before any mutable operations
-    let (
-        annotation_start_byte,
-        annotation_end_byte,
-        node_kind,
-        current_text,
-        name_node_info,
-        existing_arguments,
-    ) = {
-        // Find the annotation node at the given byte position
-        let annotation_node = ts_file.get_named_node_at_byte_position(annotation_byte_position)?;
-        let node_kind = annotation_node.kind();
-        if !matches!(node_kind, "annotation" | "marker_annotation") {
-            return None;
-        }
-        let current_text = ts_file.get_text_from_node(&annotation_node)?.to_string();
-        let name_node_info = get_annotation_name_node(ts_file, annotation_node)
-            .map(|n| n.end_byte() - annotation_node.start_byte());
-        let existing_arguments = get_annotation_argument_pair_nodes(ts_file, annotation_node);
-        (
-            annotation_node.start_byte(),
-            annotation_node.end_byte(),
-            node_kind,
-            current_text,
-            name_node_info,
-            existing_arguments,
-        )
-    };
-    let new_content = if node_kind == "marker_annotation" {
-        // Convert marker annotation to annotation with single value
-        // @Test -> @Test(value)
-        let name_end_pos = name_node_info?;
-        let before = &current_text[..name_end_pos];
-        let after = &current_text[name_end_pos..];
-        format!("{}({}){}", before, value, after)
+    let current_text = ts_file.get_text_from_node(&annotation_node)?.to_string();
+    let name_node_info = get_annotation_name_node(ts_file, annotation_node)
+      .map(|n| n.end_byte() - annotation_node.start_byte());
+    let existing_arguments = get_annotation_argument_pair_nodes(ts_file, annotation_node);
+    (
+      annotation_node.start_byte(),
+      annotation_node.end_byte(),
+      node_kind,
+      current_text,
+      name_node_info,
+      existing_arguments,
+    )
+  };
+  let new_content = if node_kind == "marker_annotation" {
+    // Convert marker annotation to annotation with single value
+    // @Test -> @Test(value)
+    let name_end_pos = name_node_info?;
+    let before = &current_text[..name_end_pos];
+    let after = &current_text[name_end_pos..];
+    format!("{}({}){}", before, value, after)
+  } else {
+    // Add single value to existing annotation
+    if existing_arguments.is_empty() {
+      // No existing arguments, add single value
+      // @JsonView -> @JsonView(Views.Public.class)
+      let name_end_pos = name_node_info?;
+      let before = &current_text[..name_end_pos];
+      let after = &current_text[name_end_pos..];
+      format!("{}({}){}", before, value, after)
     } else {
-        // Add single value to existing annotation
-        if existing_arguments.is_empty() {
-            // No existing arguments, add single value
-            // @JsonView -> @JsonView(Views.Public.class)
-            let name_end_pos = name_node_info?;
-            let before = &current_text[..name_end_pos];
-            let after = &current_text[name_end_pos..];
-            format!("{}({}){}", before, value, after)
-        } else {
-            // Existing arguments present - need to check if it's single value or named arguments
-            // For simplicity, we'll add as a named argument with key "value"
-            // This handles the case where someone might mix single value with named arguments
-            let last_argument = existing_arguments.last()?;
-            let insert_pos = last_argument.end_byte() - annotation_start_byte;
-            let before = &current_text[..insert_pos];
-            let after = &current_text[insert_pos..];
-            format!("{}, value = {}{}", before, value, after)
-        }
-    };
-    ts_file.replace_text_by_byte_range(annotation_start_byte, annotation_end_byte, &new_content)
+      // Existing arguments present - need to check if it's single value or named arguments
+      // For simplicity, we'll add as a named argument with key "value"
+      // This handles the case where someone might mix single value with named arguments
+      let last_argument = existing_arguments.last()?;
+      let insert_pos = last_argument.end_byte() - annotation_start_byte;
+      let before = &current_text[..insert_pos];
+      let after = &current_text[insert_pos..];
+      format!("{}, value = {}{}", before, value, after)
+    }
+  };
+  ts_file.replace_text_by_byte_range(annotation_start_byte, annotation_end_byte, &new_content)
 }

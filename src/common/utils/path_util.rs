@@ -16,28 +16,28 @@ use crate::common::{ts_file::TSFile, types::java_source_directory_type::JavaSour
 /// # Returns
 /// An `Option<PathBuf>` containing the found directory path, or `None` if not found
 fn find_directory_recursively(root_dir: &Path, target_dir: &str) -> Option<PathBuf> {
-    for entry in WalkDir::new(root_dir).into_iter().flatten() {
-        let path = entry.path();
-        if path.is_dir() && path.ends_with(target_dir) {
-            return Some(path.to_path_buf());
-        }
+  for entry in WalkDir::new(root_dir).into_iter().flatten() {
+    let path = entry.path();
+    if path.is_dir() && path.ends_with(target_dir) {
+      return Some(path.to_path_buf());
     }
-    None
+  }
+  None
 }
 
 pub fn parse_all_files(cwd: &Path) -> Vec<TSFile> {
-    let extension = "java";
-    let mut files = Vec::new();
-    for entry in WalkDir::new(cwd).into_iter().flatten() {
-        let path = entry.path();
-        if let Some(ext) = path.extension()
-            && ext.to_string_lossy().eq_ignore_ascii_case(extension)
-            && let Ok(ts_file) = TSFile::from_file(path)
-        {
-            files.push(ts_file);
-        }
+  let extension = "java";
+  let mut files = Vec::new();
+  for entry in WalkDir::new(cwd).into_iter().flatten() {
+    let path = entry.path();
+    if let Some(ext) = path.extension()
+      && ext.to_string_lossy().eq_ignore_ascii_case(extension)
+      && let Ok(ts_file) = TSFile::from_file(path)
+    {
+      files.push(ts_file);
     }
-    files
+  }
+  files
 }
 
 /// Resolves the file system path for a given package scope within the specified source directory type.
@@ -69,23 +69,23 @@ pub fn parse_all_files(cwd: &Path) -> Vec<TSFile> {
 /// }
 /// ```
 pub fn get_file_path_from_package_scope(
-    root_dir: &Path,
-    package_scope: &str,
-    source_directory_type: &JavaSourceDirectoryType,
+  root_dir: &Path,
+  package_scope: &str,
+  source_directory_type: &JavaSourceDirectoryType,
 ) -> Option<PathBuf> {
-    if !root_dir.exists() || !root_dir.is_dir() {
-        return None;
-    }
-    if package_scope.trim().is_empty() {
-        return None;
-    }
-    let src_dir_name = source_directory_type.get_directory_path();
-    let source_dir = find_directory_recursively(root_dir, src_dir_name)
-        .unwrap_or_else(|| root_dir.join(src_dir_name));
-    let package_as_path = package_scope.replace('.', "/");
-    let full_package_dir = source_dir.join(package_as_path);
-    match fs::create_dir_all(&full_package_dir) {
-        Ok(_) => Some(full_package_dir),
-        Err(_) => None,
-    }
+  if !root_dir.exists() || !root_dir.is_dir() {
+    return None;
+  }
+  if package_scope.trim().is_empty() {
+    return None;
+  }
+  let src_dir_name = source_directory_type.get_directory_path();
+  let source_dir = find_directory_recursively(root_dir, src_dir_name)
+    .unwrap_or_else(|| root_dir.join(src_dir_name));
+  let package_as_path = package_scope.replace('.', "/");
+  let full_package_dir = source_dir.join(package_as_path);
+  match fs::create_dir_all(&full_package_dir) {
+    Ok(_) => Some(full_package_dir),
+    Err(_) => None,
+  }
 }
