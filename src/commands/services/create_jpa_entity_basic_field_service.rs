@@ -217,17 +217,17 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
 pub fn run(
     _cwd: &Path,
     entity_file_path: &Path,
-    field_config: BasicFieldConfig,
+    field_config: &BasicFieldConfig,
 ) -> Result<FileResponse, String> {
     // Step 1: Process field config
-    let processed_field_config = process_field_config(&field_config);
+    let processed_field_config = process_field_config(field_config);
     // Step 2: Parse entity file
     let mut entity_ts_file = parse_entity_file(entity_file_path)?;
     // Step 3: Process imports
     let mut import_map: HashMap<String, String> = HashMap::new();
     process_imports(&mut import_map, &processed_field_config);
     // Step 4: Add field and annotations
-    add_field_and_annotations(&mut entity_ts_file, &field_config, &processed_field_config)?;
+    add_field_and_annotations(&mut entity_ts_file, field_config, &processed_field_config)?;
     // Step 5: Add imports
     add_imports(&mut entity_ts_file, &import_map);
     // Step 6: Save file

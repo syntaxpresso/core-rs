@@ -9,7 +9,7 @@ use crate::{
 pub fn execute(
     cwd: &Path,
     entity_file_path: &Path,
-    field_config: BasicFieldConfig,
+    field_config: &BasicFieldConfig,
 ) -> Response<FileResponse> {
     let cwd_string = cwd.display().to_string();
     let cmd_name = String::from("create-jpa-entity-basic-field");
