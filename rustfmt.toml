@@ -1,0 +1,7 @@
+tab_spaces = 4
+max_width = 100
+
+# This setting (used by Google's Chromium project) disables
+# heuristics that split lines too aggressively, leading to a
+# more stable and "simpler" formatting style like google-java-format.
+use_small_heuristics = "Max"

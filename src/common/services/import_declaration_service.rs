@@ -23,11 +23,7 @@ pub fn get_all_import_declaration_nodes<'a>(ts_file: &'a TSFile) -> Vec<Node<'a>
     let query_string = r#"
         (import_declaration) @declaration
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .returning("declaration")
-        .execute()
-    {
+    match ts_file.query_builder(query_string).returning("declaration").execute() {
         Ok(result) => result.nodes(),
         Err(_) => Vec::new(),
     }
@@ -240,10 +236,7 @@ pub fn add_import<'a>(
         let before = &file_content[..insertion_byte];
         let after = &file_content[insertion_byte..];
         let formated_import_text = format!("import {}.{};", import_package_scope, import_class);
-        match (
-            import_insertion_point.break_line_before,
-            import_insertion_point.break_line_after,
-        ) {
+        match (import_insertion_point.break_line_before, import_insertion_point.break_line_after) {
             (true, true) => format!("{}\n\n{}{}", before, formated_import_text, after),
             (true, false) => format!("{}\n{}{}", before, formated_import_text, after),
             (false, true) => format!("{}{}\n{}", before, formated_import_text, after),

@@ -32,11 +32,7 @@ pub fn get_first_public_interface_node<'a>(ts_file: &'a TSFile) -> Option<Node<'
           name: (identifier) @interfaceName
         ) @interfaceDeclaration
     "#;
-    if let Ok(results) = ts_file
-        .query_builder(query_string)
-        .returning_all_captures()
-        .execute()
-    {
+    if let Ok(results) = ts_file.query_builder(query_string).returning_all_captures().execute() {
         let captures = results.captures();
         for capture_map in captures {
             if let Some(modifiers_node) = capture_map.get("modifiers")

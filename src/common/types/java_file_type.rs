@@ -35,10 +35,7 @@ impl JavaFileType {
         let normalized_type_name = case_util::to_pascal_case(type_name);
         match self {
             JavaFileType::Class => {
-                format!(
-                    "package {};\n\npublic class {} {{}}",
-                    package_name, normalized_type_name
-                )
+                format!("package {};\n\npublic class {} {{}}", package_name, normalized_type_name)
             }
             JavaFileType::Interface => {
                 format!(
@@ -47,10 +44,7 @@ impl JavaFileType {
                 )
             }
             JavaFileType::Enum => {
-                format!(
-                    "package {};\n\npublic enum {} {{}}",
-                    package_name, normalized_type_name
-                )
+                format!("package {};\n\npublic enum {} {{}}", package_name, normalized_type_name)
             }
             JavaFileType::Record => {
                 format!(

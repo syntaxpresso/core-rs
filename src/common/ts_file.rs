@@ -113,8 +113,7 @@ impl TSFile {
         if let Some(tree) = &mut self.tree {
             tree.edit(&edit);
             // Apply the text change
-            self.source_code
-                .replace_range(start_byte..old_end_byte, new_text);
+            self.source_code.replace_range(start_byte..old_end_byte, new_text);
             // Incremental re-parse (much faster than full reparse!)
             self.tree = self.parser.parse(&self.source_code, Some(tree));
             self.modified = true;
@@ -127,9 +126,7 @@ impl TSFile {
     pub fn from_source_code(source_code: &str) -> Self {
         let mut parser = Parser::new();
         let language = tree_sitter_java::LANGUAGE;
-        parser
-            .set_language(&language.into())
-            .expect("Error loading Java parser");
+        parser.set_language(&language.into()).expect("Error loading Java parser");
         let tree = parser.parse(source_code, None);
         TSFile {
             language: language.into(),
@@ -146,9 +143,7 @@ impl TSFile {
         let source_code = fs::read_to_string(path)?;
         let mut parser = Parser::new();
         let language = tree_sitter_java::LANGUAGE;
-        parser
-            .set_language(&language.into())
-            .expect("Error loading Java parser");
+        parser.set_language(&language.into()).expect("Error loading Java parser");
         let tree = parser.parse(&source_code, None);
         Ok(TSFile {
             language: language.into(),
@@ -241,9 +236,8 @@ impl TSFile {
         let file = self.file.as_ref().ok_or_else(|| {
             std::io::Error::other("Cannot rename a file that has not been saved yet.")
         })?;
-        let parent_dir = file
-            .parent()
-            .ok_or_else(|| std::io::Error::other("Unable to get parent directory"))?;
+        let parent_dir =
+            file.parent().ok_or_else(|| std::io::Error::other("Unable to get parent directory"))?;
         let target_path = parent_dir.join(new_name);
         self.new_path = Some(target_path);
         self.modified = true;
@@ -261,11 +255,7 @@ impl TSFile {
     }
 
     pub fn get_file_name_without_ext(&self) -> Option<String> {
-        self.file
-            .as_ref()?
-            .file_stem()?
-            .to_str()
-            .map(|s| s.to_string())
+        self.file.as_ref()?.file_stem()?.to_str().map(|s| s.to_string())
     }
 
     /// Is file modified
@@ -384,11 +374,7 @@ impl TSFile {
         // We need to get node info before doing the replacement since we need immutable access
         let (start_pos, end_pos, node_kind) = {
             if let Some(node) = self.get_named_node_at_byte_position(start_byte) {
-                (
-                    node.start_position(),
-                    node.end_position(),
-                    node.kind().to_string(),
-                )
+                (node.start_position(), node.end_position(), node.kind().to_string())
             } else {
                 return None;
             }

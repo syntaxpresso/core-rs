@@ -34,31 +34,22 @@ fn build_save_path(
     package_name: &str,
     corrected_file_name: &str,
 ) -> std::path::PathBuf {
-    source_directory
-        .get_full_path(cwd, package_name)
-        .join(corrected_file_name)
+    source_directory.get_full_path(cwd, package_name).join(corrected_file_name)
 }
 
 fn save_ts_file(ts_file: &mut TSFile, save_path: &std::path::Path) -> Result<(), String> {
-    ts_file
-        .save_as(save_path)
-        .map_err(|e| format!("Failed to save file: {}", e))
+    ts_file.save_as(save_path).map_err(|e| format!("Failed to save file: {}", e))
 }
 
 fn build_file_response(ts_file: &TSFile, package_name: &str) -> Result<FileResponse, String> {
-    let file_type_str = ts_file
-        .get_file_name_without_ext()
-        .ok_or("Failed to get file type string")?;
+    let file_type_str =
+        ts_file.get_file_name_without_ext().ok_or("Failed to get file type string")?;
     let file_path = ts_file
         .file_path()
         .map(|p| p.to_string_lossy().to_string())
         .ok_or("Failed to get file path")?;
     let file_package_name = package_name.to_string();
-    Ok(FileResponse {
-        file_type: file_type_str,
-        file_path,
-        file_package_name,
-    })
+    Ok(FileResponse { file_type: file_type_str, file_path, file_package_name })
 }
 
 pub fn run(

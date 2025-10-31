@@ -56,10 +56,7 @@ pub fn detect_case(s: &str) -> CaseType {
     let has_uppercase = s.chars().any(|c| c.is_uppercase());
     let has_lowercase = s.chars().any(|c| c.is_lowercase());
     let starts_with_uppercase = s.chars().next().is_some_and(|c| c.is_uppercase());
-    let is_all_uppercase = s
-        .chars()
-        .filter(|c| c.is_alphabetic())
-        .all(|c| c.is_uppercase());
+    let is_all_uppercase = s.chars().filter(|c| c.is_alphabetic()).all(|c| c.is_uppercase());
     // Check for screaming snake case first (ALL_UPPERCASE_WITH_UNDERSCORES)
     if has_underscores && is_all_uppercase && !has_hyphens && !has_spaces {
         return CaseType::ScreamingSnake;
@@ -79,9 +76,8 @@ pub fn detect_case(s: &str) -> CaseType {
     // Check for Title Case (spaces with each word capitalized)
     if has_spaces && has_uppercase && starts_with_uppercase && !has_underscores && !has_hyphens {
         let words: Vec<&str> = s.split_whitespace().collect();
-        let all_words_capitalized = words
-            .iter()
-            .all(|word| word.chars().next().is_some_and(|c| c.is_uppercase()));
+        let all_words_capitalized =
+            words.iter().all(|word| word.chars().next().is_some_and(|c| c.is_uppercase()));
         if all_words_capitalized {
             return CaseType::Title;
         }

@@ -16,12 +16,7 @@ pub struct GetJpaEntityInfoResponse {
 
 #[derive(Debug, Clone)]
 pub enum IdFieldSearchResult {
-    Found {
-        field_type: String,
-        package_name: String,
-    },
+    Found { field_type: String, package_name: String },
     NotFound,
-    ExternalSuperclass {
-        superclass_name: String,
-    },
+    ExternalSuperclass { superclass_name: String },
 }

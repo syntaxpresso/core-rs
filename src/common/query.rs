@@ -53,20 +53,14 @@ pub struct TSQueryResult<'a> {
 
 impl<'a> TSQueryResult<'a> {
     pub fn new(matches: Vec<QueryMatch<'a>>, return_mode: ReturnMode) -> Self {
-        Self {
-            matches,
-            return_mode,
-        }
+        Self { matches, return_mode }
     }
 
     pub fn nodes(&self) -> Vec<Node<'a>> {
         match &self.return_mode {
-            ReturnMode::SingleCapture(capture_name) => self
-                .matches
-                .iter()
-                .filter_map(|m| m.get(capture_name))
-                .copied()
-                .collect(),
+            ReturnMode::SingleCapture(capture_name) => {
+                self.matches.iter().filter_map(|m| m.get(capture_name)).copied().collect()
+            }
             ReturnMode::FilteredCaptures(capture_names) => {
                 let mut nodes = Vec::new();
                 for match_data in &self.matches {
@@ -124,11 +118,7 @@ impl<'a> TSQueryResult<'a> {
     }
 
     pub fn nodes_from(&self, capture_name: &str) -> Vec<Node<'a>> {
-        self.matches
-            .iter()
-            .filter_map(|m| m.get(capture_name))
-            .copied()
-            .collect()
+        self.matches.iter().filter_map(|m| m.get(capture_name)).copied().collect()
     }
 
     pub fn first_node_from(&self, capture_name: &str) -> Option<Node<'a>> {
@@ -147,12 +137,8 @@ impl<'a> TSQueryResult<'a> {
     where
         F: Fn(&QueryMatch<'a>) -> bool,
     {
-        let filtered_matches: Vec<QueryMatch<'a>> = self
-            .matches
-            .iter()
-            .filter(|m| predicate(m))
-            .cloned()
-            .collect();
+        let filtered_matches: Vec<QueryMatch<'a>> =
+            self.matches.iter().filter(|m| predicate(m)).cloned().collect();
 
         TSQueryResult::new(filtered_matches, self.return_mode.clone())
     }
@@ -174,12 +160,7 @@ pub struct TSQueryBuilder<'a> {
 
 impl<'a> TSQueryBuilder<'a> {
     pub fn new(file: &'a TSFile, query_string: String) -> Self {
-        Self {
-            file,
-            query_string,
-            scope_node: None,
-            return_mode: ReturnMode::AllNodes,
-        }
+        Self { file, query_string, scope_node: None, return_mode: ReturnMode::AllNodes }
     }
 
     pub fn within(mut self, node: Node<'a>) -> Self {
@@ -214,9 +195,7 @@ impl<'a> TSQueryBuilder<'a> {
             let mut match_data = QueryMatch::new();
             for capture in query_match.captures {
                 let capture_name = query.capture_names()[capture.index as usize];
-                match_data
-                    .captures
-                    .insert(capture_name.to_string(), capture.node);
+                match_data.captures.insert(capture_name.to_string(), capture.node);
             }
             matches.push(match_data);
         }

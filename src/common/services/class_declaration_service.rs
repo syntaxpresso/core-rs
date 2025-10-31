@@ -12,11 +12,7 @@ fn get_first_public_class_node<'a>(ts_file: &'a TSFile) -> Option<Node<'a>> {
           name: (identifier) @className
         ) @classDeclaration
     "#;
-    if let Ok(results) = ts_file
-        .query_builder(query_string)
-        .returning_all_captures()
-        .execute()
-    {
+    if let Ok(results) = ts_file.query_builder(query_string).returning_all_captures().execute() {
         let captures = results.captures();
         for capture_map in captures {
             if let Some(modifiers_node) = capture_map.get("modifiers")
@@ -40,12 +36,7 @@ pub fn find_class_node_by_name<'a>(ts_file: &'a TSFile, class_name: &str) -> Opt
         "#,
         class_name
     );
-    ts_file
-        .query_builder(&query_string)
-        .returning("classDeclaration")
-        .execute()
-        .ok()?
-        .first_node()
+    ts_file.query_builder(&query_string).returning("classDeclaration").execute().ok()?.first_node()
 }
 
 pub fn get_public_class_node<'a>(ts_file: &'a TSFile) -> Option<Node<'a>> {
@@ -64,16 +55,8 @@ pub fn get_all_class_declaration_nodes<'a>(ts_file: &'a TSFile) -> Vec<HashMap<S
         (class_declaration
           name: (identifier) @className) @classDeclaration
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .returning_all_captures()
-        .execute()
-    {
-        Ok(result) => result
-            .captures()
-            .iter()
-            .map(|m| m.captures.clone())
-            .collect(),
+    match ts_file.query_builder(query_string).returning_all_captures().execute() {
+        Ok(result) => result.captures().iter().map(|m| m.captures.clone()).collect(),
         Err(_) => Vec::new(),
     }
 }

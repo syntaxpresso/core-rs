@@ -14,4 +14,3 @@ pub enum ImportInsertionPosition {
     AfterLastImport,
     AfterPackageDeclaration,
 }
-

@@ -18,9 +18,7 @@ use crate::responses::get_jpa_entity_info_response::{
 };
 
 fn decode_base64_to_bytes(b64: &str) -> Result<Vec<u8>, String> {
-    BASE64_STANDARD
-        .decode(b64)
-        .map_err(|e| format!("Failed to decode base64: {}", e))
+    BASE64_STANDARD.decode(b64).map_err(|e| format!("Failed to decode base64: {}", e))
 }
 
 fn bytes_to_string(bytes: &[u8]) -> Result<String, String> {
@@ -83,10 +81,9 @@ fn find_id_field_info(
 ) -> Result<(Option<String>, Option<String>), String> {
     let id_field_result = find_id_field_recursive(ts_file, class_node)?;
     match id_field_result {
-        IdFieldSearchResult::Found {
-            field_type,
-            package_name,
-        } => Ok((Some(field_type), Some(package_name))),
+        IdFieldSearchResult::Found { field_type, package_name } => {
+            Ok((Some(field_type), Some(package_name)))
+        }
         _ => Ok((None, None)),
     }
 }
@@ -117,9 +114,7 @@ fn find_id_field_recursive(
     if let Some(superclass) = superclass_name
         && is_external_class(&superclass)
     {
-        return Ok(IdFieldSearchResult::ExternalSuperclass {
-            superclass_name: superclass,
-        });
+        return Ok(IdFieldSearchResult::ExternalSuperclass { superclass_name: superclass });
     }
     Ok(IdFieldSearchResult::NotFound)
 }
@@ -258,9 +253,7 @@ pub fn run(
     // Step 6: Find ID field info
     let (id_field_type, id_field_package_name) = find_id_field_info(&ts_file, &public_class_node)?;
     // Step 7: Build and return response
-    let entity_path = ts_file
-        .file_path()
-        .map(|path| path.to_string_lossy().to_string());
+    let entity_path = ts_file.file_path().map(|path| path.to_string_lossy().to_string());
     // Step 8: Get superclass type
     let superclass_name = get_superclass_name(&ts_file, &public_class_node);
     Ok(GetJpaEntityInfoResponse {

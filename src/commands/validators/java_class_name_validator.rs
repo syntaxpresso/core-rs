@@ -4,12 +4,9 @@ pub fn validate_java_class_name(s: &str) -> Result<String, String> {
     }
     // Allow various case formats (snake_case, camelCase, PascalCase, kebab-case, etc.)
     // We'll convert them internally to PascalCase for Java conventions
-    if !s
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-    {
+    if !s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
         return Err(
-            "Class name can only contain letters, numbers, underscores, and hyphens".to_string(),
+            "Class name can only contain letters, numbers, underscores, and hyphens".to_string()
         );
     }
     let reserved_words = [

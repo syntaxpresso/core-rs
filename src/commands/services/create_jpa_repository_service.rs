@@ -52,11 +52,7 @@ pub fn create_jpa_repository_response(
     superclass_type: Option<String>,
     file_response: Option<FileResponse>,
 ) -> CreateJPARepositoryResponse {
-    CreateJPARepositoryResponse {
-        id_field_found,
-        superclass_type,
-        repository: file_response,
-    }
+    CreateJPARepositoryResponse { id_field_found, superclass_type, repository: file_response }
 }
 
 fn create_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
@@ -73,17 +69,9 @@ fn create_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
                 ts_file, node,
             )
         })
-        .and_then(|scope_node| {
-            ts_file
-                .get_text_from_node(&scope_node)
-                .map(|s| s.to_string())
-        })
+        .and_then(|scope_node| ts_file.get_text_from_node(&scope_node).map(|s| s.to_string()))
         .unwrap_or_default();
-    Ok(FileResponse {
-        file_path,
-        file_type,
-        file_package_name: package_name,
-    })
+    Ok(FileResponse { file_path, file_type, file_package_name: package_name })
 }
 
 fn create_and_extend_jpa_repository(
@@ -100,11 +88,7 @@ fn create_and_extend_jpa_repository(
         &mut jpa_repository_ts_file,
         entity_type,
         jpa_entity_info.id_field_type.as_ref().unwrap().as_ref(),
-        jpa_entity_info
-            .id_field_package_name
-            .as_ref()
-            .unwrap()
-            .as_ref(),
+        jpa_entity_info.id_field_package_name.as_ref().unwrap().as_ref(),
     );
     Ok(jpa_repository_ts_file)
 }
@@ -121,14 +105,10 @@ fn extend_jpa_repository(
     }
     let public_interface_name_node =
         get_interface_name_node(jpa_repository_ts_file, public_interface_node.unwrap());
-    let jpa_repository_ext_str = format!(
-        " extends JpaRepository<{}, {}> ",
-        entity_type, id_field_type
-    );
-    jpa_repository_ts_file.insert_text(
-        public_interface_name_node.unwrap().end_byte(),
-        &jpa_repository_ext_str,
-    );
+    let jpa_repository_ext_str =
+        format!(" extends JpaRepository<{}, {}> ", entity_type, id_field_type);
+    jpa_repository_ts_file
+        .insert_text(public_interface_name_node.unwrap().end_byte(), &jpa_repository_ext_str);
     let package_declaration_node = get_package_declaration_node(jpa_repository_ts_file);
     if package_declaration_node.is_none() {
         return;
@@ -154,9 +134,7 @@ fn step_parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
 }
 
 fn step_extract_entity_type(entity_ts_file: &TSFile) -> String {
-    entity_ts_file
-        .get_file_name_without_ext()
-        .unwrap_or_else(|| "Unknown".to_string())
+    entity_ts_file.get_file_name_without_ext().unwrap_or_else(|| "Unknown".to_string())
 }
 
 fn step_get_jpa_entity_info(

@@ -21,12 +21,7 @@ use tree_sitter::Node;
 pub fn get_package_declaration_node(ts_file: &TSFile) -> Option<Node<'_>> {
     ts_file.tree.as_ref()?;
     let query_string = "(package_declaration) @package";
-    ts_file
-        .query_builder(query_string)
-        .returning("package")
-        .first_node()
-        .ok()
-        .flatten()
+    ts_file.query_builder(query_string).returning("package").first_node().ok().flatten()
 }
 
 /// Extracts the rightmost part (class name) from a package declaration.

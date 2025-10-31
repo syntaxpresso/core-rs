@@ -141,20 +141,12 @@ impl Commands {
                 );
                 response.to_json_pretty().map_err(|e| e.into())
             }
-            Commands::CreateJPAEntity {
-                cwd,
-                package_name,
-                file_name,
-            } => {
+            Commands::CreateJPAEntity { cwd, package_name, file_name } => {
                 let response =
                     create_jpa_entity_command::execute(cwd.as_path(), package_name, file_name);
                 response.to_json_pretty().map_err(|e| e.into())
             }
-            Commands::CreateJPARepository {
-                cwd,
-                entity_file_path,
-                b64_superclass_source,
-            } => {
+            Commands::CreateJPARepository { cwd, entity_file_path, b64_superclass_source } => {
                 let response = create_jpa_repository_command::execute(
                     cwd.as_path(),
                     entity_file_path.as_path(),
@@ -162,11 +154,7 @@ impl Commands {
                 );
                 response.to_json_pretty().map_err(|e| e.into())
             }
-            Commands::GetJPAEntityInfo {
-                cwd,
-                entity_file_path,
-                b64_source_code,
-            } => {
+            Commands::GetJPAEntityInfo { cwd, entity_file_path, b64_source_code } => {
                 let response = get_jpa_entity_info_command::execute(
                     cwd.as_path(),
                     entity_file_path.as_deref(),

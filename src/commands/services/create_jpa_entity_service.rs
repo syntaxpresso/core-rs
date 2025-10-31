@@ -34,19 +34,14 @@ fn add_jpa_imports(ts_file: &mut TSFile) -> Result<(), String> {
 }
 
 fn build_file_response(ts_file: &TSFile, package_name: &str) -> Result<FileResponse, String> {
-    let file_type_str = ts_file
-        .get_file_name_without_ext()
-        .ok_or("Failed to get file type string")?;
+    let file_type_str =
+        ts_file.get_file_name_without_ext().ok_or("Failed to get file type string")?;
     let file_path = ts_file
         .file_path()
         .map(|p| p.to_string_lossy().to_string())
         .ok_or("Failed to get file path")?;
     let file_package_name = package_name.to_string();
-    Ok(FileResponse {
-        file_type: file_type_str,
-        file_path,
-        file_package_name,
-    })
+    Ok(FileResponse { file_type: file_type_str, file_path, file_package_name })
 }
 
 fn create_java_file_and_get_response(
@@ -76,22 +71,14 @@ fn add_entity_annotation(ts_file: &mut TSFile, class_byte_position: usize) -> Re
     let position = AnnotationInsertionPosition::AboveScopeDeclaration;
     let result =
         annotation_service::add_annotation(ts_file, class_byte_position, &position, "@Entity");
-    if result.is_none() {
-        Err("Failed to add @Entity annotation".to_string())
-    } else {
-        Ok(())
-    }
+    if result.is_none() { Err("Failed to add @Entity annotation".to_string()) } else { Ok(()) }
 }
 
 fn add_table_annotation(ts_file: &mut TSFile, class_byte_position: usize) -> Result<(), String> {
     let position = AnnotationInsertionPosition::AboveScopeDeclaration;
     let result =
         annotation_service::add_annotation(ts_file, class_byte_position, &position, "@Table");
-    if result.is_none() {
-        Err("Failed to add @Table annotation".to_string())
-    } else {
-        Ok(())
-    }
+    if result.is_none() { Err("Failed to add @Table annotation".to_string()) } else { Ok(()) }
 }
 
 fn add_table_name_argument(ts_file: &mut TSFile, class_name: &str) -> Result<(), String> {
@@ -118,9 +105,7 @@ fn add_table_name_argument(ts_file: &mut TSFile, class_name: &str) -> Result<(),
 
 fn save_ts_file(ts_file: &mut TSFile, file_path: &str) -> Result<(), String> {
     let save_path = std::path::Path::new(file_path);
-    ts_file
-        .save_as(save_path)
-        .map_err(|_| "Failed to save file".to_string())
+    ts_file.save_as(save_path).map_err(|_| "Failed to save file".to_string())
 }
 
 pub fn run(cwd: &Path, package_name: &str, file_name: &str) -> Result<FileResponse, String> {

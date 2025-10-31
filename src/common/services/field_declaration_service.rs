@@ -30,11 +30,7 @@ struct PendingAnnotation {
 
 impl<'a> FieldAnnotationBuilder<'a> {
     pub fn new(ts_file: &'a mut TSFile, field_start_byte: usize) -> Self {
-        Self {
-            ts_file,
-            field_start_byte,
-            pending_annotations: Vec::new(),
-        }
+        Self { ts_file, field_start_byte, pending_annotations: Vec::new() }
     }
 
     pub fn add_annotation(&mut self, annotation_text: &str) -> Result<&mut Self, String> {
@@ -47,9 +43,8 @@ impl<'a> FieldAnnotationBuilder<'a> {
 
     fn find_field_declaration_node(&self) -> Option<Node<'_>> {
         // Start from the byte position and traverse up to find field_declaration
-        let mut current_node = self
-            .ts_file
-            .get_named_node_at_byte_position(self.field_start_byte)?;
+        let mut current_node =
+            self.ts_file.get_named_node_at_byte_position(self.field_start_byte)?;
         // If we're already at a field_declaration, return it
         if current_node.kind() == "field_declaration" {
             return Some(current_node);
@@ -77,9 +72,7 @@ impl<'a> FieldAnnotationBuilder<'a> {
             .find(|pa| pa.annotation_text == annotation_text)
             .ok_or_else(|| format!("No pending annotation found for: {}", annotation_text))?;
 
-        pending_annotation
-            .arguments
-            .push((key.to_string(), value.to_string()));
+        pending_annotation.arguments.push((key.to_string(), value.to_string()));
         Ok(self)
     }
 
@@ -91,17 +84,14 @@ impl<'a> FieldAnnotationBuilder<'a> {
             .find(|pa| pa.annotation_text == annotation_text)
             .ok_or_else(|| format!("No pending annotation found for: {}", annotation_text))?;
         // For single value annotations, we store it as a special argument
-        pending_annotation
-            .arguments
-            .push(("__single_value__".to_string(), value.to_string()));
+        pending_annotation.arguments.push(("__single_value__".to_string(), value.to_string()));
         Ok(self)
     }
 
     pub fn build(&mut self) -> Result<(), String> {
         // Find the actual field_declaration node from the byte position
-        let field_node = self
-            .find_field_declaration_node()
-            .ok_or("Failed to find field declaration node")?;
+        let field_node =
+            self.find_field_declaration_node().ok_or("Failed to find field declaration node")?;
         let field_start_byte = field_node.start_byte();
         // Process each pending annotation
         for pending_annotation in &self.pending_annotations {
@@ -516,11 +506,7 @@ fn find_class_declaration_node_from_position<'a>(
                 }
                 current = current_node.parent();
             }
-            if node.kind() == "class_declaration" {
-                Some(node)
-            } else {
-                None
-            }
+            if node.kind() == "class_declaration" { Some(node) } else { None }
         }
     }
 }
@@ -549,20 +535,11 @@ where
     let (class_body_start_byte, class_body_end_byte, current_body_text, all_fields) = {
         let current_body_text = ts_file.get_text_from_node(&class_body_node)?.to_string();
         let all_fields = get_all_field_declaration_nodes(ts_file, class_declaration_node);
-        (
-            class_body_node.start_byte(),
-            class_body_node.end_byte(),
-            current_body_text,
-            all_fields,
-        )
+        (class_body_node.start_byte(), class_body_node.end_byte(), current_body_text, all_fields)
     };
     // Build the field declaration text
-    let modifiers_str = params
-        .field_modifiers
-        .iter()
-        .map(|m| m.keyword())
-        .collect::<Vec<_>>()
-        .join(" ");
+    let modifiers_str =
+        params.field_modifiers.iter().map(|m| m.keyword()).collect::<Vec<_>>().join(" ");
     let mut field_text = String::new();
     field_text.push_str("  "); // Indentation
     if params.visibility_modifier.has_keyword() {

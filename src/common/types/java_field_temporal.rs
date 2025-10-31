@@ -61,9 +61,7 @@ impl TryFrom<&str> for JavaFieldTemporal {
             "date" => Ok(JavaFieldTemporal::Date),
             "time" => Ok(JavaFieldTemporal::Time),
             "timestamp" => Ok(JavaFieldTemporal::Timestamp),
-            _ => Err(TemporalFromStringError {
-                value: value.to_string(),
-            }),
+            _ => Err(TemporalFromStringError { value: value.to_string() }),
         }
     }
 }

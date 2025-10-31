@@ -71,9 +71,7 @@ impl TryFrom<&str> for JavaFieldTimeZoneStorage {
             "normalize_utc" => Ok(JavaFieldTimeZoneStorage::NormalizeUtc),
             "column" => Ok(JavaFieldTimeZoneStorage::Column),
             "auto" => Ok(JavaFieldTimeZoneStorage::Auto),
-            _ => Err(TimeZoneStorageFromStringError {
-                value: value.to_string(),
-            }),
+            _ => Err(TimeZoneStorageFromStringError { value: value.to_string() }),
         }
     }
 }

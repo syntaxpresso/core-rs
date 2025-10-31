@@ -59,13 +59,7 @@ where
     /// # Returns
     /// A new Response representing a successful operation
     pub fn success(command: String, cwd: String, data: T) -> Self {
-        Self {
-            command,
-            cwd,
-            succeed: true,
-            data: Some(data),
-            error_reason: None,
-        }
+        Self { command, cwd, succeed: true, data: Some(data), error_reason: None }
     }
 
     /// Creates a successful response without any data payload.
@@ -80,13 +74,7 @@ where
     /// # Returns
     /// A new Response representing a successful operation without data
     pub fn success_empty(command: String, cwd: String) -> Self {
-        Self {
-            command,
-            cwd,
-            succeed: true,
-            data: None,
-            error_reason: None,
-        }
+        Self { command, cwd, succeed: true, data: None, error_reason: None }
     }
 
     /// Creates a failure response with the provided error message.
@@ -108,13 +96,7 @@ where
         if reason.trim().is_empty() {
             panic!("Error reason cannot be empty");
         }
-        Self {
-            command,
-            cwd,
-            succeed: false,
-            data: None,
-            error_reason: Some(reason),
-        }
+        Self { command, cwd, succeed: false, data: None, error_reason: Some(reason) }
     }
 
     /// Serializes this Response to a compact JSON string.
@@ -188,10 +170,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.to_json() {
             Ok(json) => write!(f, "{}", json),
-            Err(_) => write!(
-                f,
-                r#"{{"succeed":false,"errorReason":"Serialization failed"}}"#
-            ),
+            Err(_) => write!(f, r#"{{"succeed":false,"errorReason":"Serialization failed"}}"#),
         }
     }
 }
@@ -209,15 +188,9 @@ mod tests {
 
     #[test]
     fn test_success_with_data() {
-        let data = TestData {
-            message: "Hello".to_string(),
-            count: 42,
-        };
-        let response = Response::success(
-            "test-command".to_string(),
-            "/test/path".to_string(),
-            data.clone(),
-        );
+        let data = TestData { message: "Hello".to_string(), count: 42 };
+        let response =
+            Response::success("test-command".to_string(), "/test/path".to_string(), data.clone());
 
         assert_eq!(response.command, "test-command");
         assert_eq!(response.cwd, "/test/path");
@@ -269,10 +242,7 @@ mod tests {
 
     #[test]
     fn test_json_serialization() {
-        let data = TestData {
-            message: "test".to_string(),
-            count: 1,
-        };
+        let data = TestData { message: "test".to_string(), count: 1 };
         let response =
             Response::success("test-command".to_string(), "/test/path".to_string(), data);
 

@@ -48,11 +48,7 @@ fn process_imports(
     add_to_import_map(import_map, "jakarta.persistence", "Column");
     if processed_field_config.should_add_timezone_storage_annotation {
         add_to_import_map(import_map, "org.hibernate.annotations", "TimeZoneStorage");
-        add_to_import_map(
-            import_map,
-            "org.hibernate.annotations",
-            "TimeZoneStorageType",
-        );
+        add_to_import_map(import_map, "org.hibernate.annotations", "TimeZoneStorageType");
         add_to_import_map(import_map, "java.time", "OffsetDateTime");
     }
     if processed_field_config.should_add_temporal_annotation {
@@ -69,29 +65,18 @@ fn process_field_config(field_config: &BasicFieldConfig) -> ProcessedFieldConfig
     let mut should_add_timezone_storage_annotation = false;
     let mut should_add_temporal_annotation = false;
     let mut should_add_lob_annotation = false;
-    let time_zone_aware_types: HashSet<&str> = [
-        "java.time.OffsetDateTime",
-        "java.time.ZonedDateTime",
-        "java.time.OffsetTime",
-    ]
-    .iter()
-    .cloned()
-    .collect();
-    let temporal_aware_types: HashSet<&str> =
-        ["java.util.Date", "java.util.Calendar", "java.sql.Date"]
+    let time_zone_aware_types: HashSet<&str> =
+        ["java.time.OffsetDateTime", "java.time.ZonedDateTime", "java.time.OffsetTime"]
             .iter()
             .cloned()
             .collect();
-    let lob_aware_types: HashSet<&str> = [
-        "java.lang.String",
-        "byte[]",
-        "java.lang.Byte[]",
-        "char[]",
-        "java.lang.Character[]",
-    ]
-    .iter()
-    .cloned()
-    .collect();
+    let temporal_aware_types: HashSet<&str> =
+        ["java.util.Date", "java.util.Calendar", "java.sql.Date"].iter().cloned().collect();
+    let lob_aware_types: HashSet<&str> =
+        ["java.lang.String", "byte[]", "java.lang.Byte[]", "char[]", "java.lang.Character[]"]
+            .iter()
+            .cloned()
+            .collect();
     let full_type = field_config
         .field_type_package_name
         .as_ref()
@@ -134,14 +119,9 @@ fn add_field_and_annotations(
     };
     let column_name_snake_case =
         case_util::auto_convert_case(&field_config.field_name, CaseType::Snake);
-    let timezone_storage_type = field_config
-        .field_timezone_storage
-        .clone()
-        .unwrap_or(JavaFieldTimeZoneStorage::Auto);
-    let temporal_type = field_config
-        .field_temporal
-        .clone()
-        .unwrap_or(JavaFieldTemporal::Timestamp);
+    let timezone_storage_type =
+        field_config.field_timezone_storage.clone().unwrap_or(JavaFieldTimeZoneStorage::Auto);
+    let temporal_type = field_config.field_temporal.clone().unwrap_or(JavaFieldTemporal::Timestamp);
     add_field_declaration(ts_file, public_class_node_start_byte, params, |builder| {
         builder.add_annotation("@Column")?.with_argument(
             "@Column",
@@ -189,17 +169,13 @@ fn parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
 }
 
 fn save_file(ts_file: &mut TSFile) -> Result<(), String> {
-    ts_file
-        .save()
-        .map_err(|e| format!("Unable to save JPA Entity file: {}", e))
+    ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))
 }
 
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
     let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
-    let file_path = ts_file
-        .file_path()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
+    let file_path =
+        ts_file.file_path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
     let file_package_node = get_package_declaration_node(ts_file)
         .ok_or_else(|| "Unable to get JPA Entity's package node".to_string())?;
     let file_package_scope_node = get_package_class_scope_node(ts_file, file_package_node);
@@ -207,11 +183,7 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
         .and_then(|node| ts_file.get_text_from_node(&node))
         .unwrap_or("")
         .to_string();
-    Ok(FileResponse {
-        file_type,
-        file_package_name,
-        file_path,
-    })
+    Ok(FileResponse { file_type, file_package_name, file_path })
 }
 
 pub fn run(

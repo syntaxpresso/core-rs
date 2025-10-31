@@ -35,11 +35,7 @@ pub fn get_all_annotation_nodes<'a>(ts_file: &'a TSFile, scope_node: Node<'a>) -
           ]
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .execute()
-    {
+    match ts_file.query_builder(query_string).within(scope_node).execute() {
         Ok(result) => result.nodes(),
         Err(_) => Vec::new(),
     }
@@ -109,12 +105,7 @@ pub fn get_annotation_argument_pair_nodes<'a>(
           )
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("pair")
-        .execute()
-    {
+    match ts_file.query_builder(query_string).within(scope_node).returning("pair").execute() {
         Ok(result) => result.nodes(),
         Err(_) => Vec::new(),
     }
@@ -136,12 +127,7 @@ pub fn get_annotation_argument_key_nodes<'a>(
           )
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("key")
-        .execute()
-    {
+    match ts_file.query_builder(query_string).within(scope_node).returning("key").execute() {
         Ok(result) => result.nodes(),
         Err(_) => Vec::new(),
     }
@@ -163,12 +149,7 @@ pub fn get_annotation_argument_value_nodes<'a>(
           )
         )
     "#;
-    match ts_file
-        .query_builder(query_string)
-        .within(scope_node)
-        .returning("value")
-        .execute()
-    {
+    match ts_file.query_builder(query_string).within(scope_node).returning("value").execute() {
         Ok(result) => result.nodes(),
         Err(_) => Vec::new(),
     }
@@ -215,10 +196,7 @@ fn detect_indentation(
         let full_text = &ts_file.source_code;
         let annotation_start = first_annotation.start_byte();
         // Find the start of the line containing this annotation
-        let line_start = full_text[..annotation_start]
-            .rfind('\n')
-            .map(|pos| pos + 1)
-            .unwrap_or(0);
+        let line_start = full_text[..annotation_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
         // Extract indentation (spaces/tabs before the annotation)
         if let Some(line_text) = full_text.get(line_start..annotation_start) {
             return line_text.to_string();
@@ -228,10 +206,7 @@ fn detect_indentation(
     let full_text = &ts_file.source_code;
     let decl_start = declaration_node.start_byte();
     // Find the start of the line containing this declaration
-    let line_start = full_text[..decl_start]
-        .rfind('\n')
-        .map(|pos| pos + 1)
-        .unwrap_or(0);
+    let line_start = full_text[..decl_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
     // Extract indentation from the declaration line
     if let Some(line_text) = full_text.get(line_start..decl_start) {
         return line_text.to_string();
@@ -313,10 +288,7 @@ pub fn add_annotation<'a>(
         let actual_start_byte = if all_annotations.is_empty() {
             // Find the actual start including leading whitespace
             let decl_start = declaration_node.start_byte();
-            ts_file.source_code[..decl_start]
-                .rfind('\n')
-                .map(|pos| pos + 1)
-                .unwrap_or(0)
+            ts_file.source_code[..decl_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0)
         } else {
             declaration_node.start_byte()
         };
@@ -381,10 +353,7 @@ pub fn add_annotation<'a>(
                 // No annotations exist, insert at beginning
                 // Since we're now including the leading whitespace in the replacement range,
                 // we need to format the content with proper indentation for both annotation and field
-                format!(
-                    "{}{}\n{}{}",
-                    indentation, annotation_text, indentation, current_text
-                )
+                format!("{}{}\n{}{}", indentation, annotation_text, indentation, current_text)
             } else {
                 // Insert after last annotation
                 let last_annotation = all_annotations.last()?;
@@ -427,21 +396,15 @@ pub fn add_annotation_argument<'a>(
         let source_text = &ts_file.source_code;
         let annotation_start = annotation_node.start_byte();
         // Find the start of the line containing this annotation
-        let line_start = source_text[..annotation_start]
-            .rfind('\n')
-            .map(|pos| pos + 1)
-            .unwrap_or(0);
+        let line_start =
+            source_text[..annotation_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
         // Check if there's only whitespace between line start and annotation
         let leading_text = &source_text[line_start..annotation_start];
         let annotation_only_text = ts_file.get_text_from_node(&annotation_node)?.to_string();
         let (current_text, actual_start_byte, name_offset) = if leading_text.trim().is_empty() {
             // Include leading whitespace in the text and extend the range
             let whitespace_len = leading_text.len();
-            (
-                format!("{}{}", leading_text, annotation_only_text),
-                line_start,
-                whitespace_len,
-            )
+            (format!("{}{}", leading_text, annotation_only_text), line_start, whitespace_len)
         } else {
             // Annotation is not at the start of the line, use original approach
             (annotation_only_text, annotation_start, 0)
