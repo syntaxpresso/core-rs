@@ -205,7 +205,7 @@ impl Commands {
                 let response = create_jpa_entity_basic_field_command::execute(
                     cwd.as_path(),
                     entity_file_path.as_path(),
-                    field_config,
+                    &field_config,
                 );
                 response.to_json_pretty().map_err(|e| e.into())
             }
