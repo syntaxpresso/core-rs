@@ -4,7 +4,7 @@ pub mod create_jpa_entity_command;
 pub mod create_jpa_entity_enum_field_command;
 pub mod create_jpa_entity_id_field_command;
 pub mod create_jpa_repository_command;
-pub mod get_all_files_command;
+pub mod get_all_jpa_entities_command;
 pub mod get_all_jpa_mapped_superclasses;
 pub mod get_jpa_entity_info_command;
 pub mod services;
@@ -31,7 +31,7 @@ use crate::{
 
 #[derive(Subcommand)]
 pub enum Commands {
-  GetAllFiles {
+  GetAllJPAEntities {
     #[arg(long, value_parser = validate_directory, required = true)]
     cwd: PathBuf,
   },
@@ -195,8 +195,8 @@ pub enum Commands {
 impl Commands {
   pub fn execute(&self) -> Result<String, Box<dyn std::error::Error>> {
     match self {
-      Commands::GetAllFiles { cwd } => {
-        let response = get_all_files_command::execute(cwd.as_path());
+      Commands::GetAllJPAEntities { cwd } => {
+        let response = get_all_jpa_entities_command::execute(cwd.as_path());
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::GetAllJPAMappedSuperclasses { cwd } => {
