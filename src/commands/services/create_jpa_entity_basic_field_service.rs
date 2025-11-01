@@ -106,6 +106,11 @@ fn add_field_and_annotations(
   field_config: &BasicFieldConfig,
   processed_field_config: &ProcessedFieldConfig,
 ) -> Result<(), String> {
+  let field_name_pascal_case =
+    case_util::auto_convert_case(&field_config.field_name, CaseType::Pascal);
+  let column_name_snake_case =
+    case_util::auto_convert_case(&field_config.field_name, CaseType::Snake);
+
   let public_class_node = get_public_class_node(ts_file)
     .ok_or_else(|| "Unable to get public class node from Entity".to_string())?;
   let public_class_node_start_byte = public_class_node.start_byte();
@@ -114,11 +119,9 @@ fn add_field_and_annotations(
     visibility_modifier: JavaVisibilityModifier::Private,
     field_modifiers: vec![],
     field_type: &field_config.field_type,
-    field_name: &field_config.field_name,
+    field_name: &field_name_pascal_case,
     field_initialization: None,
   };
-  let column_name_snake_case =
-    case_util::auto_convert_case(&field_config.field_name, CaseType::Snake);
   let timezone_storage_type =
     field_config.field_timezone_storage.clone().unwrap_or(JavaFieldTimeZoneStorage::Auto);
   let temporal_type = field_config.field_temporal.clone().unwrap_or(JavaFieldTemporal::Timestamp);
