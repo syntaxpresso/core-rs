@@ -25,16 +25,20 @@ fn find_directory_recursively(root_dir: &Path, target_dir: &str) -> Option<PathB
   None
 }
 
-pub fn parse_all_files(cwd: &Path) -> Vec<TSFile> {
+pub fn parse_all_files(cwd: &Path, source_directory_type: &JavaSourceDirectoryType) -> Vec<TSFile> {
   let extension = "java";
   let mut files = Vec::new();
-  for entry in WalkDir::new(cwd).into_iter().flatten() {
-    let path = entry.path();
-    if let Some(ext) = path.extension()
-      && ext.to_string_lossy().eq_ignore_ascii_case(extension)
-      && let Ok(ts_file) = TSFile::from_file(path)
-    {
-      files.push(ts_file);
+  let src_dir_path = source_directory_type.get_directory_path();
+  let target_dir = cwd.join(src_dir_path);
+  if target_dir.exists() {
+    for entry in WalkDir::new(&target_dir).into_iter().flatten() {
+      let path = entry.path();
+      if let Some(ext) = path.extension()
+        && ext.to_string_lossy().eq_ignore_ascii_case(extension)
+        && let Ok(ts_file) = TSFile::from_file(path)
+      {
+        files.push(ts_file);
+      }
     }
   }
   files

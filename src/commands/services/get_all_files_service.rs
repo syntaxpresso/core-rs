@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::{
   common::{
     services::package_declaration_service::{get_package_declaration_node, get_package_scope_node},
+    types::java_source_directory_type::JavaSourceDirectoryType,
     utils::path_util::parse_all_files,
   },
   responses::file_response::FileResponse,
@@ -10,7 +11,7 @@ use crate::{
 
 pub fn run(cwd: &Path) -> Result<Vec<FileResponse>, String> {
   let mut files = Vec::new();
-  let ts_files = parse_all_files(cwd);
+  let ts_files = parse_all_files(cwd, &JavaSourceDirectoryType::All);
   for ts_file in ts_files {
     let file_type = ts_file.get_file_name_without_ext().unwrap_or_else(|| "Unknown".to_string());
     let file_path = ts_file

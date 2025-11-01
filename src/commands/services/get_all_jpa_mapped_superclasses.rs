@@ -7,6 +7,7 @@ use crate::{
       class_declaration_service::get_public_class_node,
       package_declaration_service::{get_package_declaration_node, get_package_scope_node},
     },
+    types::java_source_directory_type::JavaSourceDirectoryType,
     utils::path_util::parse_all_files,
   },
   responses::file_response::FileResponse,
@@ -14,7 +15,7 @@ use crate::{
 
 pub fn run(cwd: &Path) -> Result<Vec<FileResponse>, String> {
   let mut files: Vec<FileResponse> = Vec::new();
-  let ts_files = parse_all_files(cwd);
+  let ts_files = parse_all_files(cwd, &JavaSourceDirectoryType::Main);
   for ts_file in ts_files {
     match get_public_class_node(&ts_file) {
       Some(public_class_node) => {
