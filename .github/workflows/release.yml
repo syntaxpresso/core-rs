@@ -11,7 +11,8 @@ jobs:
   # This job handles versioning and tagging
   release:
     # The 'if' condition ensures this job only runs for merged pull requests from develop to main
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    # and excludes documentation-only PRs
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop' && !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -97,6 +98,8 @@ jobs:
 
   # This job builds the native binaries for multiple platforms
   build-native:
+    # Skip this job if the PR is labeled as documentation-only
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     needs: release
     strategy:
       matrix:
@@ -190,6 +193,8 @@ jobs:
 
   # This job creates the GitHub Release and uploads the binaries
   create-release:
+    # Skip this job if the PR is labeled as documentation-only
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     needs: [release, build-native]
     runs-on: ubuntu-latest
     permissions:
