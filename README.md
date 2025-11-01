@@ -18,7 +18,7 @@ Syntaxpresso Core is designed as a backend service for IDE plugins, offering com
 
 ## Features
 
-### 📋 Available Commands
+### Available Commands
 
 #### Entity Management
 
