@@ -91,6 +91,44 @@ pub fn validate_file_path_within_base(
     .map_err(|e| format!("File path security validation failed: {}", e))
 }
 
+/// Validates that a directory exists and is accessible, without security restrictions.
+/// This function is designed for the --cwd parameter to allow users to work on any project
+/// they have access to. Security validation happens WITHIN the chosen directory, not on the directory itself.
+///
+/// # Arguments
+/// * `s` - The directory path string to validate
+///
+/// # Returns
+/// * `Ok(PathBuf)` - The canonicalized directory path
+/// * `Err(String)` - If the directory is invalid or doesn't exist
+///
+/// # Security Philosophy
+/// - The --cwd parameter should accept any valid directory (user's project root)
+/// - Security restrictions apply to operations WITHIN the chosen cwd, not to the cwd selection itself
+/// - Users should be able to work on projects anywhere they have filesystem access
+///
+/// # Usage with clap
+/// ```rust
+/// #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+/// cwd: PathBuf,
+/// ```
+pub fn validate_directory_unrestricted(s: &str) -> Result<PathBuf, String> {
+  let path = PathBuf::from(s);
+  
+  // Basic validation - ensure directory exists and is accessible
+  if !path.exists() {
+    return Err(format!("Directory does not exist: {}", s));
+  }
+  
+  if !path.is_dir() {
+    return Err(format!("Path is not a directory: {}", s));
+  }
+  
+  // Canonicalize to resolve any symbolic links and get absolute path
+  path.canonicalize()
+    .map_err(|e| format!("Cannot canonicalize directory path '{}': {}", s, e))
+}
+
 /// Wrapper function for validate_directory_with_security that uses current directory as base.
 /// This function is designed for use with clap's value_parser to provide secure directory validation
 /// for command line arguments, preventing path traversal attacks on working directory parameters.
