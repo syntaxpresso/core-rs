@@ -3,6 +3,7 @@ pub mod create_jpa_entity_basic_field_command;
 pub mod create_jpa_entity_command;
 pub mod create_jpa_entity_enum_field_command;
 pub mod create_jpa_entity_id_field_command;
+pub mod create_jpa_many_to_one_relationship_command;
 pub mod create_jpa_one_to_one_relationship_command;
 pub mod create_jpa_repository_command;
 pub mod get_all_jpa_entities_command;
@@ -22,12 +23,13 @@ use crate::{
   },
   common::types::{
     basic_field_config::BasicFieldConfig, cascade_type::CascadeType,
-    enum_field_config::EnumFieldConfig, id_field_config::IdFieldConfig,
+    collection_type::CollectionType, enum_field_config::EnumFieldConfig, 
+    fetch_type::FetchType, id_field_config::IdFieldConfig,
     java_enum_type::JavaEnumType, java_field_temporal::JavaFieldTemporal,
     java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
     java_id_generation::JavaIdGeneration, java_id_generation_type::JavaIdGenerationType,
-    java_source_directory_type::JavaSourceDirectoryType, mapping_type::MappingType,
-    one_to_one_field_config::OneToOneFieldConfig, other_type::OtherType,
+    java_source_directory_type::JavaSourceDirectoryType, many_to_one_field_config::ManyToOneFieldConfig,
+    mapping_type::MappingType, one_to_one_field_config::OneToOneFieldConfig, other_type::OtherType,
   },
 };
 
@@ -223,6 +225,43 @@ pub enum Commands {
     #[arg(long, required = false)]
     inverse_side_other: Vec<OtherType>,
   },
+  CreateJPAManyToOneRelationship {
+    #[arg(long, value_parser = validate_directory, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    owning_side_entity_file_path: PathBuf,
+
+    #[arg(long, required = true)]
+    owning_side_field_name: String,
+
+    #[arg(long, required = true)]
+    inverse_side_field_name: String,
+
+    #[arg(long, required = true)]
+    inverse_field_type: String,
+
+    #[arg(long, required = true)]
+    fetch_type: FetchType,
+
+    #[arg(long, required = true)]
+    collection_type: CollectionType,
+
+    #[arg(long, required = false)]
+    mapping_type: Option<MappingType>,
+
+    #[arg(long, required = false)]
+    owning_side_cascades: Vec<CascadeType>,
+
+    #[arg(long, required = false)]
+    inverse_side_cascades: Vec<CascadeType>,
+
+    #[arg(long, required = false)]
+    owning_side_other: Vec<OtherType>,
+
+    #[arg(long, required = false)]
+    inverse_side_other: Vec<OtherType>,
+  },
 }
 
 impl Commands {
@@ -382,6 +421,39 @@ impl Commands {
           inverse_side_other: inverse_side_other.clone(),
         };
         let response = create_jpa_one_to_one_relationship_command::execute(
+          cwd.as_path(),
+          owning_side_entity_file_path.as_path(),
+          owning_side_field_name.clone(),
+          inverse_side_field_name.clone(),
+          config,
+        );
+        response.to_json_pretty().map_err(|e| e.into())
+      }
+      Commands::CreateJPAManyToOneRelationship {
+        cwd,
+        owning_side_entity_file_path,
+        owning_side_field_name,
+        inverse_side_field_name,
+        inverse_field_type,
+        fetch_type,
+        collection_type,
+        mapping_type,
+        owning_side_cascades,
+        inverse_side_cascades,
+        owning_side_other,
+        inverse_side_other,
+      } => {
+        let config = ManyToOneFieldConfig {
+          inverse_field_type: inverse_field_type.clone(),
+          fetch_type: fetch_type.clone(),
+          collection_type: collection_type.clone(),
+          mapping_type: mapping_type.clone(),
+          owning_side_cascades: owning_side_cascades.clone(),
+          inverse_side_cascades: inverse_side_cascades.clone(),
+          owning_side_other: owning_side_other.clone(),
+          inverse_side_other: inverse_side_other.clone(),
+        };
+        let response = create_jpa_many_to_one_relationship_command::execute(
           cwd.as_path(),
           owning_side_entity_file_path.as_path(),
           owning_side_field_name.clone(),
