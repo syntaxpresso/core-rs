@@ -1,3 +1,4 @@
+pub mod annotation_config;
 pub mod annotation_types;
 pub mod basic_field_config;
 pub mod cascade_type;
@@ -21,3 +22,4 @@ pub mod many_to_one_field_config;
 pub mod mapping_type;
 pub mod one_to_one_field_config;
 pub mod other_type;
+pub mod processed_imports;

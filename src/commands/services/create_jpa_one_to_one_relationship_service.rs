@@ -7,6 +7,7 @@ use crate::common::services::package_declaration_service::{
   get_package_declaration_node, get_package_scope_node,
 };
 use crate::common::ts_file::TSFile;
+use crate::common::types::annotation_config::AnnotationConfig;
 use crate::common::types::cascade_type::CascadeType;
 use crate::common::types::entity_side::EntitySide;
 use crate::common::types::field_types::FieldInsertionPosition;
@@ -16,25 +17,14 @@ use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::types::mapping_type::MappingType;
 use crate::common::types::one_to_one_field_config::OneToOneFieldConfig;
 use crate::common::types::other_type::OtherType;
+use crate::common::types::processed_imports::ProcessedImports;
 use crate::common::utils::case_util::{self, CaseType};
 use crate::common::utils::path_util::parse_all_files;
 use crate::responses::file_response::FileResponse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-struct AnnotationConfig {
-  #[allow(dead_code)]
-  pub is_owning_side: bool,
-  pub cascades: Vec<CascadeType>,
-  pub other_options: Vec<OtherType>,
-  pub mapped_by_field: Option<String>,
-  pub needs_join_column: bool,
-}
 
-struct ProcessedImports {
-  pub entity_class_import: Option<(String, String)>,
-  pub jpa_imports: Vec<(String, String)>,
-}
 
 fn add_to_import_map(
   import_map: &mut HashMap<String, String>,
@@ -106,13 +96,13 @@ fn build_annotation_config(
   };
   let is_owning_side = side == EntitySide::Owning;
   let is_unidirectional = field_config.mapping_type == Some(MappingType::UnidirectionalJoinColumn);
-  AnnotationConfig {
+  AnnotationConfig::new_one_to_one(
     is_owning_side,
     cascades,
     other_options,
-    mapped_by_field: if is_owning_side || is_unidirectional { None } else { mapped_by_field_name },
-    needs_join_column: is_owning_side || is_unidirectional,
-  }
+    if is_owning_side || is_unidirectional { None } else { mapped_by_field_name },
+    is_owning_side || is_unidirectional,
+  )
 }
 
 fn process_imports(
@@ -130,8 +120,12 @@ fn process_imports(
     jpa_imports.push(("jakarta.persistence".to_string(), "CascadeType".to_string()));
   }
   let target_entity_package = get_entity_package_name(target_entity_file_path)?;
-  let entity_class_import = Some((target_entity_package, target_entity_type.to_string()));
-  Ok(ProcessedImports { entity_class_import, jpa_imports })
+  let mut processed_imports = ProcessedImports::new();
+  processed_imports.set_entity_import(target_entity_package, target_entity_type.to_string());
+  for (package, class_name) in jpa_imports {
+    processed_imports.add_jpa_import(package, class_name);
+  }
+  Ok(processed_imports)
 }
 
 fn build_cascade_param(cascades: &[CascadeType]) -> Option<String> {

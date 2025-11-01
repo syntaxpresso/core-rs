@@ -7,8 +7,9 @@ use crate::common::services::package_declaration_service::{
   get_package_declaration_node, get_package_scope_node,
 };
 use crate::common::ts_file::TSFile;
+use crate::common::types::annotation_config::AnnotationConfig;
 use crate::common::types::cascade_type::CascadeType;
-use crate::common::types::collection_type::CollectionType;
+
 use crate::common::types::entity_side::EntitySide;
 use crate::common::types::fetch_type::FetchType;
 use crate::common::types::field_types::FieldInsertionPosition;
@@ -18,27 +19,14 @@ use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::types::many_to_one_field_config::ManyToOneFieldConfig;
 use crate::common::types::mapping_type::MappingType;
 use crate::common::types::other_type::OtherType;
+use crate::common::types::processed_imports::ProcessedImports;
 use crate::common::utils::case_util::{self, CaseType};
 use crate::common::utils::path_util::parse_all_files;
 use crate::responses::file_response::FileResponse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-struct AnnotationConfig {
-  #[allow(dead_code)]
-  pub is_owning_side: bool,
-  pub cascades: Vec<CascadeType>,
-  pub other_options: Vec<OtherType>,
-  pub mapped_by_field: Option<String>,
-  pub needs_join_column: bool,
-  pub fetch_type: FetchType,
-  pub collection_type: CollectionType,
-}
 
-struct ProcessedImports {
-  pub entity_class_import: Option<(String, String)>,
-  pub jpa_imports: Vec<(String, String)>,
-}
 
 fn add_to_import_map(
   import_map: &mut HashMap<String, String>,
@@ -84,8 +72,8 @@ fn extract_owning_entity_class_name(file_path: &Path) -> Result<String, String> 
 }
 
 fn get_entity_package_name(entity_file_path: &Path) -> Result<String, String> {
-  let entity_ts_file = TSFile::from_file(entity_file_path)
-    .map_err(|_| "Unable to parse entity file".to_string())?;
+  let entity_ts_file =
+    TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse entity file".to_string())?;
   let package_node = get_package_declaration_node(&entity_ts_file)
     .ok_or_else(|| "Unable to get entity's package node".to_string())?;
   let package_scope_node = get_package_scope_node(&entity_ts_file, package_node);
@@ -110,15 +98,15 @@ fn build_annotation_config(
   };
   let is_owning_side = side == EntitySide::Owning;
   let is_unidirectional = field_config.mapping_type == Some(MappingType::UnidirectionalJoinColumn);
-  AnnotationConfig {
+  AnnotationConfig::new_many_to_one(
     is_owning_side,
     cascades,
     other_options,
-    mapped_by_field: if is_owning_side || is_unidirectional { None } else { mapped_by_field_name },
-    needs_join_column: is_owning_side || is_unidirectional,
-    fetch_type: field_config.fetch_type.clone(),
-    collection_type: field_config.collection_type.clone(),
-  }
+    if is_owning_side || is_unidirectional { None } else { mapped_by_field_name },
+    is_owning_side || is_unidirectional,
+    field_config.fetch_type.clone(),
+    field_config.collection_type.clone(),
+  )
 }
 
 fn process_imports(
@@ -128,7 +116,7 @@ fn process_imports(
   annotation_config: &AnnotationConfig,
 ) -> Result<ProcessedImports, String> {
   let mut jpa_imports = Vec::new();
-  
+
   // Add relationship annotation (ManyToOne for owning side, OneToMany for inverse side)
   if annotation_config.is_owning_side {
     jpa_imports.push(("jakarta.persistence".to_string(), "ManyToOne".to_string()));
@@ -137,35 +125,37 @@ fn process_imports(
     // Add collection import for inverse side
     jpa_imports.push((
       "java.util".to_string(),
-      annotation_config.collection_type.as_java_type().to_string(),
+      annotation_config.get_collection_type().unwrap().as_java_type().to_string(),
     ));
   }
-  
+
   // Add FetchType import if needed
-  if annotation_config.fetch_type != FetchType::None {
+  if annotation_config.get_fetch_type().map_or(false, |ft| *ft != FetchType::None) {
     jpa_imports.push(("jakarta.persistence".to_string(), "FetchType".to_string()));
   }
-  
+
   if annotation_config.needs_join_column {
     jpa_imports.push(("jakarta.persistence".to_string(), "JoinColumn".to_string()));
   }
   if !annotation_config.cascades.is_empty() {
     jpa_imports.push(("jakarta.persistence".to_string(), "CascadeType".to_string()));
   }
-  
+
   let target_entity_package = get_entity_package_name(target_entity_file_path)?;
-  let entity_class_import = Some((target_entity_package, target_entity_type.to_string()));
-  Ok(ProcessedImports { entity_class_import, jpa_imports })
+  let mut processed_imports = ProcessedImports::new();
+  processed_imports.set_entity_import(target_entity_package, target_entity_type.to_string());
+  for (package, class_name) in jpa_imports {
+    processed_imports.add_jpa_import(package, class_name);
+  }
+  Ok(processed_imports)
 }
 
 fn build_cascade_param(cascades: &[CascadeType]) -> Option<String> {
   if cascades.is_empty() {
     return None;
   }
-  let cascade_values: Vec<String> = cascades
-    .iter()
-    .map(|cascade| format!("CascadeType.{}", cascade.as_str()))
-    .collect();
+  let cascade_values: Vec<String> =
+    cascades.iter().map(|cascade| format!("CascadeType.{}", cascade.as_str())).collect();
   Some(format!("{{{}}}", cascade_values.join(", ")))
 }
 
@@ -179,13 +169,13 @@ fn add_relationship_field(
     .ok_or_else(|| "Unable to get JPA Entity's public class node".to_string())?;
   let public_class_node_start_byte = public_class_node.start_byte();
   let target_field_name_snake_case = case_util::auto_convert_case(field_name, CaseType::Snake);
-  
+
   let field_type = if annotation_config.is_owning_side {
     target_entity_type.to_string()
   } else {
-    format!("{}<{}>", annotation_config.collection_type.as_java_type(), target_entity_type)
+    format!("{}<{}>", annotation_config.get_collection_type().unwrap().as_java_type(), target_entity_type)
   };
-  
+
   let params = AddFieldDeclarationParams {
     insertion_position: FieldInsertionPosition::EndOfClassBody,
     visibility_modifier: JavaVisibilityModifier::Private,
@@ -194,22 +184,26 @@ fn add_relationship_field(
     field_name: &target_field_name_snake_case,
     field_initialization: None,
   };
-  
+
   add_field_declaration(ts_file, public_class_node_start_byte, params, |builder| {
     // Add the appropriate relationship annotation
     if annotation_config.is_owning_side {
       builder.add_annotation("@ManyToOne")?;
-      
+
       // Add fetch type if specified
-      if annotation_config.fetch_type != FetchType::None {
-        builder.with_argument("@ManyToOne", "fetch", &format!("FetchType.{}", annotation_config.fetch_type.as_str()))?;
+  if annotation_config.get_fetch_type().map_or(false, |ft| *ft != FetchType::None) {
+        builder.with_argument(
+          "@ManyToOne",
+          "fetch",
+          &format!("FetchType.{}", annotation_config.get_fetch_type().unwrap().as_str()),
+        )?;
       }
-      
+
       // Add cascade if specified
       if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
         builder.with_argument("@ManyToOne", "cascade", &cascade_param)?;
       }
-      
+
       // Add optional parameter based on mandatory flag
       let is_mandatory = annotation_config.other_options.contains(&OtherType::Mandatory);
       if !is_mandatory {
@@ -220,24 +214,28 @@ fn add_relationship_field(
     } else {
       // Inverse side - OneToMany
       builder.add_annotation("@OneToMany")?;
-      
+
       // Add mappedBy for inverse side
       if let Some(ref mapped_by_field) = annotation_config.mapped_by_field {
         let mapped_by_snake_case = case_util::auto_convert_case(mapped_by_field, CaseType::Snake);
-        builder.with_argument("@OneToMany", "mappedBy", &format!("\"{}\"", mapped_by_snake_case))?;
+        builder.with_argument(
+          "@OneToMany",
+          "mappedBy",
+          &format!("\"{}\"", mapped_by_snake_case),
+        )?;
       }
-      
+
       // Add cascade if specified
       if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
         builder.with_argument("@OneToMany", "cascade", &cascade_param)?;
       }
-      
+
       // Add orphan removal if specified
       if annotation_config.other_options.contains(&OtherType::OrphanRemoval) {
         builder.with_argument("@OneToMany", "orphanRemoval", "true")?;
       }
     }
-    
+
     // Add JoinColumn for owning side
     if annotation_config.needs_join_column {
       builder.add_annotation("@JoinColumn")?;
@@ -253,7 +251,7 @@ fn add_relationship_field(
         builder.with_argument("@JoinColumn", "unique", "true")?;
       }
     }
-    
+
     builder.build()
   })
   .ok_or_else(|| "Unable to add relationship field to the JPA Entity".to_string())?
@@ -376,3 +374,4 @@ pub fn run(
   }
   Ok(responses)
 }
+
