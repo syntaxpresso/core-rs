@@ -1,0 +1,238 @@
+# Name for the workflow
+name: Release
+# Controls when the workflow will run
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - "main"
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This job handles versioning and tagging
+  release:
+    # The 'if' condition ensures this job only runs for merged pull requests from develop to main
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Outputs that can be used by other jobs
+    outputs:
+      version: ${{ steps.create_version.outputs.VERSION }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+      
+      - name: Get current version and calculate next
+        id: create_version
+        run: |
+          # Get the latest tag directly from Git
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag from Git: '$LATEST_TAG'"
+          
+          # Remove 'v' prefix and validate
+          CURRENT_VERSION=${LATEST_TAG#v}
+          echo "Cleaned current version: '$CURRENT_VERSION'"
+          
+          if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Could not parse version from tag. Got: '$CURRENT_VERSION'"
+            echo "Setting fallback version to 0.0.1"
+            CURRENT_VERSION="0.0.1"
+          fi
+          
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          if [[ -z "$MAJOR" || -z "$MINOR" || -z "$PATCH" ]]; then
+            echo "Error: Failed to parse version components from '$CURRENT_VERSION'"
+            exit 1
+          fi
+          
+          echo "Parsed components - MAJOR: $MAJOR, MINOR: $MINOR, PATCH: $PATCH"
+          
+          # Determine version increment based on labels
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'feature') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
+            echo "Incrementing minor version for feature/enhancement"
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bug') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'patch') }}" == "true" ]]; then
+            echo "Incrementing patch version for bug/patch"
+            PATCH=$((PATCH + 1))
+           else
+             echo "No versioning label found ('feature', 'enhancement', 'bug', 'patch'). Skipping release."
+             echo "Note: This workflow only runs for merged PRs from develop to main branch."
+             exit 0
+          fi
+          
+          # Create new version
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "New version: $NEW_VERSION"
+          
+          # Update Cargo.toml version
+          sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
+          git add Cargo.toml
+          git commit -m "chore: bump version to $NEW_VERSION" || echo "No changes to commit"
+          
+          # Set output and create tag
+          echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Creating tag: v${NEW_VERSION}"
+          git tag "v${NEW_VERSION}"
+          git push origin "v${NEW_VERSION}"
+
+  # This job builds the native binaries for multiple platforms
+  build-native:
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: amd64
+            binary_name: core
+            output_name: syntaxpresso-core-linux-amd64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            platform: macos
+            arch: amd64
+            binary_name: core
+            output_name: syntaxpresso-core-macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos
+            arch: arm64
+            binary_name: core
+            output_name: syntaxpresso-core-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: amd64
+            binary_name: core.exe
+            output_name: syntaxpresso-core-windows-amd64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+      
+      - name: Install cross-compilation dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+      
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+      
+      - name: Rename binary for platform
+        run: |
+          if [ -f "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" ]; then
+            cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "${{ matrix.output_name }}"
+            echo "Copied ${{ matrix.binary_name }} to ${{ matrix.output_name }}"
+          else
+            echo "Binary ${{ matrix.binary_name }} not found!"
+            ls -la target/${{ matrix.target }}/release/
+            exit 1
+          fi
+        shell: bash
+      
+      - name: Make binary executable (Unix)
+        if: matrix.platform != 'windows'
+        run: |
+          chmod +x "${{ matrix.output_name }}"
+          echo "Made ${{ matrix.output_name }} executable"
+      
+      - name: Verify renamed binary
+        run: |
+          if [ -f "${{ matrix.output_name }}" ]; then
+            echo "Successfully created ${{ matrix.output_name }}"
+            ls -la "${{ matrix.output_name }}"
+          else
+            echo "Failed to create ${{ matrix.output_name }}"
+            exit 1
+          fi
+        shell: bash
+      
+      - name: Upload binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}-${{ matrix.arch }}
+          path: ${{ matrix.output_name }}
+          retention-days: 1
+
+  # This job creates the GitHub Release and uploads the binaries
+  create-release:
+    needs: [release, build-native]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+      
+      - name: List downloaded files
+        run: |
+          echo "Contents of binaries directory:"
+          ls -la binaries/
+          echo ""
+          echo "Contents of each subdirectory:"
+          for dir in binaries/*/; do
+            echo "Contents of $dir:"
+            ls -la "$dir"
+          done
+      
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          cp binaries/binary-linux-amd64/syntaxpresso-core-linux-amd64 release-files/ || true
+          cp binaries/binary-macos-amd64/syntaxpresso-core-macos-amd64 release-files/ || true
+          cp binaries/binary-macos-arm64/syntaxpresso-core-macos-arm64 release-files/ || true
+          cp binaries/binary-windows-amd64/syntaxpresso-core-windows-amd64.exe release-files/ || true
+          # Make Unix binaries executable
+          chmod +x release-files/syntaxpresso-core-linux-amd64 || true
+          chmod +x release-files/syntaxpresso-core-macos-amd64 || true
+          chmod +x release-files/syntaxpresso-core-macos-arm64 || true
+          echo "Final release files with permissions:"
+          ls -la release-files/
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.release.outputs.version }}
+          generate_release_notes: true
+          files: release-files/*
