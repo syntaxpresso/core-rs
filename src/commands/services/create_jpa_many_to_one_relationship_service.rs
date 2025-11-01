@@ -136,7 +136,7 @@ fn process_imports(
     jpa_imports.push(("jakarta.persistence".to_string(), "OneToMany".to_string()));
     // Add collection import for inverse side
     jpa_imports.push((
-      annotation_config.collection_type.as_java_import().to_string(),
+      "java.util".to_string(),
       annotation_config.collection_type.as_java_type().to_string(),
     ));
   }
