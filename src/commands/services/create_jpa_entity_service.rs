@@ -103,9 +103,9 @@ fn add_table_name_argument(ts_file: &mut TSFile, class_name: &str) -> Result<(),
   }
 }
 
-fn save_ts_file(ts_file: &mut TSFile, file_path: &str) -> Result<(), String> {
+fn save_ts_file(ts_file: &mut TSFile, file_path: &str, base_path: &Path) -> Result<(), String> {
   let save_path = std::path::Path::new(file_path);
-  ts_file.save_as(save_path).map_err(|_| "Failed to save file".to_string())
+  ts_file.save_as(save_path, base_path).map_err(|e| format!("Failed to save file: {}", e))
 }
 
 pub fn run(cwd: &Path, package_name: &str, file_name: &str) -> Result<FileResponse, String> {
@@ -128,7 +128,7 @@ pub fn run(cwd: &Path, package_name: &str, file_name: &str) -> Result<FileRespon
   // Step 8: Add table name argument with snake_case conversion
   add_table_name_argument(&mut ts_file, &normalized_class_name)?;
   // Step 9: Save the updated TSFile to disk
-  save_ts_file(&mut ts_file, &file_response.file_path)?;
+  save_ts_file(&mut ts_file, &file_response.file_path, cwd)?;
   // Step 10: Build and return the final file response
   build_file_response(&ts_file, package_name)
 }
