@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::common::query::TSQueryBuilder;
+use crate::common::{query::TSQueryBuilder, utils::path_security_util::PathSecurityValidator};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tree_sitter::{
@@ -205,10 +205,9 @@ impl TSFile {
 
   /// Save to original file path
   pub fn save(&mut self) -> std::io::Result<()> {
-    let file = self
-      .file
-      .as_ref()
-      .ok_or_else(|| std::io::Error::other("File path is not set. Use save_as(path) instead."))?;
+    let file = self.file.as_ref().ok_or_else(|| {
+      std::io::Error::other("File path is not set. Use save_as(path, base_path) instead.")
+    })?;
     if let Some(new_path) = &self.new_path {
       fs::rename(file, new_path)?;
       self.file = Some(new_path.clone());
@@ -219,10 +218,46 @@ impl TSFile {
     Ok(())
   }
 
-  /// Save to a new file path
-  pub fn save_as(&mut self, path: &Path) -> std::io::Result<()> {
-    fs::write(path, &self.source_code)?;
-    self.file = Some(path.to_path_buf());
+  /// Save to a new file path with security validation against a base directory
+  ///
+  /// This method ensures that the target path is contained within the specified base directory,
+  /// preventing path traversal attacks and ensuring files are only saved within allowed locations.
+  ///
+  /// # Arguments
+  /// * `path` - The target file path to save to
+  /// * `base_path` - The base directory that must contain the target path
+  ///
+  /// # Returns
+  /// * `Ok(())` - If the file was successfully saved within the allowed directory
+  /// * `Err(std::io::Error)` - If security validation fails or file save fails
+  ///
+  /// # Security Features
+  /// - Validates path containment within base directory
+  /// - Prevents path traversal attacks (e.g., "../../../etc/passwd")
+  /// - Resolves symbolic links to prevent symlink attacks
+  /// - Canonicalizes paths for accurate security checking
+  ///
+  /// # Examples
+  /// ```
+  /// use std::path::Path;
+  ///
+  /// let mut ts_file = TSFile::from_source_code("public class Example {}");
+  /// let base_dir = Path::new("/project/root");
+  /// let target = Path::new("src/main/java/Example.java");
+  ///
+  /// ts_file.save_as(target, base_dir)?;
+  /// ```
+  pub fn save_as(&mut self, path: &Path, base_path: &Path) -> std::io::Result<()> {
+    // Create security validator
+    let validator = PathSecurityValidator::new(base_path)
+      .map_err(|e| std::io::Error::other(format!("Security validator creation failed: {}", e)))?;
+    // Validate path containment
+    let validated_path = validator
+      .validate_path_containment(path)
+      .map_err(|e| std::io::Error::other(format!("Path security validation failed: {}", e)))?;
+    // Save using the validated path
+    fs::write(&validated_path, &self.source_code)?;
+    self.file = Some(validated_path);
     self.modified = false;
     Ok(())
   }
