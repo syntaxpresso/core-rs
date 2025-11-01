@@ -4,6 +4,7 @@ use crate::{
   common::{
     ts_file::TSFile,
     types::{java_file_type::JavaFileType, java_source_directory_type::JavaSourceDirectoryType},
+    utils::path_security_util::PathSecurityValidator,
   },
   responses::file_response::FileResponse,
 };
@@ -31,12 +32,23 @@ fn build_save_path(
   cwd: &Path,
   package_name: &str,
   corrected_file_name: &str,
-) -> std::path::PathBuf {
-  source_directory.get_full_path(cwd, package_name).join(corrected_file_name)
+) -> Result<std::path::PathBuf, String> {
+  // Create path security validator for the current working directory
+  let validator = PathSecurityValidator::new(cwd)?;
+  // Build the intended path using the standard Java directory structure
+  let intended_path = source_directory.get_full_path(cwd, package_name).join(corrected_file_name);
+  // Validate that the path is contained within the working directory
+  validator
+    .validate_path_containment(&intended_path)
+    .map_err(|e| format!("Path security validation failed: {}", e))
 }
 
-fn save_ts_file(ts_file: &mut TSFile, save_path: &std::path::Path) -> Result<(), String> {
-  ts_file.save_as(save_path).map_err(|e| format!("Failed to save file: {}", e))
+fn save_ts_file(
+  ts_file: &mut TSFile,
+  save_path: &std::path::Path,
+  base_path: &Path,
+) -> Result<(), String> {
+  ts_file.save_as(save_path, base_path).map_err(|e| format!("Failed to save file: {}", e))
 }
 
 fn build_file_response(ts_file: &TSFile, package_name: &str) -> Result<FileResponse, String> {
@@ -63,13 +75,13 @@ pub fn run(
   let mut ts_file = create_ts_file(&file_template);
   // Step 3: Correct file name
   let corrected_file_name = correct_java_file_name(file_name);
-  // Step 4: Build save path
-  let save_path = build_save_path(source_directory, cwd, package_name, &corrected_file_name);
+  // Step 4: Build save path with security validation
+  let save_path = build_save_path(source_directory, cwd, package_name, &corrected_file_name)?;
   // Step 5: Check if file exists before saving
   if save_path.exists() {
     return Err(format!("File already exists: {}", save_path.display()));
   }
-  save_ts_file(&mut ts_file, &save_path)?;
+  save_ts_file(&mut ts_file, &save_path, cwd)?;
   // Step 6: Build response
   build_file_response(&ts_file, package_name)
 }
