@@ -146,6 +146,10 @@ fn parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
   TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
 }
 
+fn save_file(ts_file: &mut TSFile) -> Result<(), String> {
+  ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))
+}
+
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
   let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
   let file_path = ts_file.file_path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
@@ -158,6 +162,7 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
     .to_string();
   Ok(FileResponse { file_type, file_package_name, file_path })
 }
+
 pub fn run(
   _cwd: &Path,
   entity_file_path: &Path,
@@ -172,7 +177,7 @@ pub fn run(
   // Step 4: Add all required imports to the file
   add_imports(&mut entity_ts_file, &import_map);
   // Step 5: Write the modified file back to disk
-  entity_ts_file.save().map_err(|e| format!("Failed to write modified entity file: {}", e))?;
+  save_file(&mut entity_ts_file)?;
   // Step 6: Build and return response
   build_file_response(&entity_ts_file)
 }
