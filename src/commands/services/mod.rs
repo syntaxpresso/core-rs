@@ -1,5 +1,6 @@
 pub mod create_java_file_service;
 pub mod create_jpa_entity_basic_field_service;
+pub mod create_jpa_entity_enum_field_service;
 pub mod create_jpa_entity_id_field_service;
 pub mod create_jpa_entity_service;
 pub mod create_jpa_repository_service;

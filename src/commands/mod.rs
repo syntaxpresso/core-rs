@@ -1,5 +1,6 @@
 pub mod create_java_file_command;
 pub mod create_jpa_entity_basic_field_command;
+pub mod create_jpa_entity_enum_field_command;
 pub mod create_jpa_entity_command;
 pub mod create_jpa_entity_id_field_command;
 pub mod create_jpa_repository_command;
@@ -18,8 +19,8 @@ use crate::{
     package_name_validator::validate_package_name,
   },
   common::types::{
-    basic_field_config::BasicFieldConfig, id_field_config::IdFieldConfig,
-    java_field_temporal::JavaFieldTemporal,
+    basic_field_config::BasicFieldConfig, enum_field_config::EnumFieldConfig, id_field_config::IdFieldConfig,
+    java_enum_type::JavaEnumType, java_field_temporal::JavaFieldTemporal,
     java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
     java_id_generation::JavaIdGeneration, java_id_generation_type::JavaIdGenerationType,
     java_source_directory_type::JavaSourceDirectoryType,
@@ -155,6 +156,34 @@ pub enum Commands {
     #[arg(long)]
     field_nullable: bool,
   },
+  CreateJPAEntityEnumField {
+    #[arg(long, value_parser = validate_directory, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
+
+    #[arg(long, required = true)]
+    field_name: String,
+
+    #[arg(long, required = true)]
+    enum_type: String,
+
+    #[arg(long, required = true)]
+    enum_package_name: String,
+
+    #[arg(long, required = true)]
+    enum_type_storage: JavaEnumType,
+
+    #[arg(long, required = false)]
+    field_length: Option<u16>,
+
+    #[arg(long)]
+    field_nullable: bool,
+
+    #[arg(long)]
+    field_unique: bool,
+  },
 }
 
 impl Commands {
@@ -256,6 +285,33 @@ impl Commands {
           field_nullable: *field_nullable,
         };
         let response = create_jpa_entity_id_field_command::execute(
+          cwd.as_path(),
+          entity_file_path.as_path(),
+          field_config,
+        );
+        response.to_json_pretty().map_err(|e| e.into())
+      }
+      Commands::CreateJPAEntityEnumField {
+        cwd,
+        entity_file_path,
+        field_name,
+        enum_type,
+        enum_package_name,
+        enum_type_storage,
+        field_length,
+        field_nullable,
+        field_unique,
+      } => {
+        let field_config = EnumFieldConfig {
+          field_name: field_name.clone(),
+          enum_type: enum_type.clone(),
+          enum_package_name: enum_package_name.clone(),
+          enum_type_storage: enum_type_storage.clone(),
+          field_length: *field_length,
+          field_nullable: *field_nullable,
+          field_unique: *field_unique,
+        };
+        let response = create_jpa_entity_enum_field_command::execute(
           cwd.as_path(),
           entity_file_path.as_path(),
           field_config,

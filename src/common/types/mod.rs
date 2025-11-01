@@ -1,8 +1,10 @@
 pub mod annotation_types;
 pub mod basic_field_config;
+pub mod enum_field_config;
 pub mod field_types;
 pub mod id_field_config;
 pub mod import_types;
+pub mod java_enum_type;
 pub mod java_field_modifier;
 pub mod java_field_temporal;
 pub mod java_field_time_zone_storage;
