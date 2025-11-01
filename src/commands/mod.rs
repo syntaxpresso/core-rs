@@ -1,10 +1,11 @@
 pub mod create_java_file_command;
 pub mod create_jpa_entity_basic_field_command;
-pub mod create_jpa_entity_enum_field_command;
 pub mod create_jpa_entity_command;
+pub mod create_jpa_entity_enum_field_command;
 pub mod create_jpa_entity_id_field_command;
 pub mod create_jpa_repository_command;
 pub mod get_all_files_command;
+pub mod get_all_jpa_mapped_superclasses;
 pub mod get_jpa_entity_info_command;
 pub mod services;
 mod validators;
@@ -19,10 +20,11 @@ use crate::{
     package_name_validator::validate_package_name,
   },
   common::types::{
-    basic_field_config::BasicFieldConfig, enum_field_config::EnumFieldConfig, id_field_config::IdFieldConfig,
-    java_enum_type::JavaEnumType, java_field_temporal::JavaFieldTemporal,
-    java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
-    java_id_generation::JavaIdGeneration, java_id_generation_type::JavaIdGenerationType,
+    basic_field_config::BasicFieldConfig, enum_field_config::EnumFieldConfig,
+    id_field_config::IdFieldConfig, java_enum_type::JavaEnumType,
+    java_field_temporal::JavaFieldTemporal, java_field_time_zone_storage::JavaFieldTimeZoneStorage,
+    java_file_type::JavaFileType, java_id_generation::JavaIdGeneration,
+    java_id_generation_type::JavaIdGenerationType,
     java_source_directory_type::JavaSourceDirectoryType,
   },
 };
@@ -30,6 +32,10 @@ use crate::{
 #[derive(Subcommand)]
 pub enum Commands {
   GetAllFiles {
+    #[arg(long, value_parser = validate_directory, required = true)]
+    cwd: PathBuf,
+  },
+  GetAllJPAMappedSuperclasses {
     #[arg(long, value_parser = validate_directory, required = true)]
     cwd: PathBuf,
   },
@@ -191,6 +197,10 @@ impl Commands {
     match self {
       Commands::GetAllFiles { cwd } => {
         let response = get_all_files_command::execute(cwd.as_path());
+        response.to_json_pretty().map_err(|e| e.into())
+      }
+      Commands::GetAllJPAMappedSuperclasses { cwd } => {
+        let response = get_all_jpa_mapped_superclasses::execute(cwd.as_path());
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::CreateJavaFile { cwd, package_name, file_name, file_type, source_directory } => {

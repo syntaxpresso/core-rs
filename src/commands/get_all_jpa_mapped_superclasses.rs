@@ -1,13 +1,13 @@
 use std::path::Path;
 
 use crate::{
-  commands::services::get_all_files_service::run,
+  commands::services::get_all_jpa_mapped_superclasses::run,
   responses::{get_files_response::GetFilesResponse, response::Response},
 };
 
 pub fn execute(cwd: &Path) -> Response<GetFilesResponse> {
   let cwd_string = cwd.display().to_string();
-  let cmd_name = String::from("get-all-files");
+  let cmd_name = String::from("get-all-jpa-mapped-superclasses");
   match run(cwd) {
     Ok(files) => {
       let files_count = files.len();
