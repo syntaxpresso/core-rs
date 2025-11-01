@@ -4,13 +4,13 @@ use crate::common::types::fetch_type::FetchType;
 use crate::common::types::other_type::OtherType;
 
 /// Common annotation configuration for JPA relationship services
-/// 
+///
 /// This struct is used by both OneToOne and ManyToOne relationship services
 /// to configure the annotations that will be added to entity fields.
-/// 
+///
 /// For OneToOne relationships:
 /// - `fetch_type` and `collection_type` should be `None`
-/// 
+///
 /// For ManyToOne relationships:
 /// - `fetch_type` and `collection_type` are used for the owning and inverse sides respectively
 #[derive(Debug, Clone)]
@@ -21,7 +21,7 @@ pub struct AnnotationConfig {
   pub other_options: Vec<OtherType>,
   pub mapped_by_field: Option<String>,
   pub needs_join_column: bool,
-  
+
   // Optional fields for ManyToOne relationships
   pub fetch_type: Option<FetchType>,
   pub collection_type: Option<CollectionType>,
@@ -67,12 +67,12 @@ impl AnnotationConfig {
       collection_type: Some(collection_type),
     }
   }
-  
+
   /// Get the fetch type, or None if not applicable
   pub fn get_fetch_type(&self) -> Option<&FetchType> {
     self.fetch_type.as_ref()
   }
-  
+
   /// Get the collection type, or None if not applicable
   pub fn get_collection_type(&self) -> Option<&CollectionType> {
     self.collection_type.as_ref()

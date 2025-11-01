@@ -23,13 +23,14 @@ use crate::{
   },
   common::types::{
     basic_field_config::BasicFieldConfig, cascade_type::CascadeType,
-    collection_type::CollectionType, enum_field_config::EnumFieldConfig, 
-    fetch_type::FetchType, id_field_config::IdFieldConfig,
-    java_enum_type::JavaEnumType, java_field_temporal::JavaFieldTemporal,
-    java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
-    java_id_generation::JavaIdGeneration, java_id_generation_type::JavaIdGenerationType,
-    java_source_directory_type::JavaSourceDirectoryType, many_to_one_field_config::ManyToOneFieldConfig,
-    mapping_type::MappingType, one_to_one_field_config::OneToOneFieldConfig, other_type::OtherType,
+    collection_type::CollectionType, enum_field_config::EnumFieldConfig, fetch_type::FetchType,
+    id_field_config::IdFieldConfig, java_enum_type::JavaEnumType,
+    java_field_temporal::JavaFieldTemporal, java_field_time_zone_storage::JavaFieldTimeZoneStorage,
+    java_file_type::JavaFileType, java_id_generation::JavaIdGeneration,
+    java_id_generation_type::JavaIdGenerationType,
+    java_source_directory_type::JavaSourceDirectoryType,
+    many_to_one_field_config::ManyToOneFieldConfig, mapping_type::MappingType,
+    one_to_one_field_config::OneToOneFieldConfig, other_type::OtherType,
   },
 };
 

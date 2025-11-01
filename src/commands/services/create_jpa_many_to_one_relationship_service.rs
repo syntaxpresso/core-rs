@@ -123,10 +123,10 @@ fn process_imports(
       annotation_config.get_collection_type().unwrap().as_java_type().to_string(),
     ));
   }
-  if let Some(fetch_type) = annotation_config.get_fetch_type() {
-    if *fetch_type != FetchType::None {
-      jpa_imports.push(("jakarta.persistence".to_string(), "FetchType".to_string()));
-    }
+  if let Some(fetch_type) = annotation_config.get_fetch_type()
+    && *fetch_type != FetchType::None
+  {
+    jpa_imports.push(("jakarta.persistence".to_string(), "FetchType".to_string()));
   }
   if annotation_config.needs_join_column {
     jpa_imports.push(("jakarta.persistence".to_string(), "JoinColumn".to_string()));
@@ -171,7 +171,6 @@ fn add_relationship_field(
       target_entity_type
     )
   };
-
   let params = AddFieldDeclarationParams {
     insertion_position: FieldInsertionPosition::EndOfClassBody,
     visibility_modifier: JavaVisibilityModifier::Private,
@@ -180,18 +179,17 @@ fn add_relationship_field(
     field_name: &target_field_name_snake_case,
     field_initialization: None,
   };
-
   add_field_declaration(ts_file, public_class_node_start_byte, params, |builder| {
     if annotation_config.is_owning_side {
       builder.add_annotation("@ManyToOne")?;
-      if let Some(fetch_type) = annotation_config.get_fetch_type() {
-        if *fetch_type != FetchType::None {
-          builder.with_argument(
-            "@ManyToOne",
-            "fetch",
-            &format!("FetchType.{}", fetch_type.as_str()),
-          )?;
-        }
+      if let Some(fetch_type) = annotation_config.get_fetch_type()
+        && *fetch_type != FetchType::None
+      {
+        builder.with_argument(
+          "@ManyToOne",
+          "fetch",
+          &format!("FetchType.{}", fetch_type.as_str()),
+        )?;
       }
       if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
         builder.with_argument("@ManyToOne", "cascade", &cascade_param)?;
