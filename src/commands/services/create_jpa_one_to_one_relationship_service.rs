@@ -8,6 +8,7 @@ use crate::common::services::package_declaration_service::{
 };
 use crate::common::ts_file::TSFile;
 use crate::common::types::cascade_type::CascadeType;
+use crate::common::types::entity_side::EntitySide;
 use crate::common::types::field_types::FieldInsertionPosition;
 use crate::common::types::import_types::ImportInsertionPosition;
 use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
@@ -20,12 +21,6 @@ use crate::common::utils::path_util::parse_all_files;
 use crate::responses::file_response::FileResponse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, PartialEq)]
-enum EntitySide {
-  Owning,
-  Inverse,
-}
 
 struct AnnotationConfig {
   #[allow(dead_code)]
