@@ -18,7 +18,7 @@ use clap::Subcommand;
 
 use crate::{
   commands::validators::{
-    directory_validator::validate_directory, java_class_name_validator::validate_java_class_name,
+    directory_validator::validate_directory_secure, java_class_name_validator::validate_java_class_name,
     package_name_validator::validate_package_name,
   },
   common::types::{
@@ -37,15 +37,15 @@ use crate::{
 #[derive(Subcommand)]
 pub enum Commands {
   GetAllJPAEntities {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
   },
   GetAllJPAMappedSuperclasses {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
   },
   CreateJavaFile {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, value_parser = validate_package_name, required = true)]
@@ -61,7 +61,7 @@ pub enum Commands {
     source_directory: JavaSourceDirectoryType,
   },
   CreateJPAEntity {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, value_parser = validate_package_name, required = true)]
@@ -71,7 +71,7 @@ pub enum Commands {
     file_name: String,
   },
   CreateJPARepository {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
@@ -81,7 +81,7 @@ pub enum Commands {
     b64_superclass_source: Option<String>,
   },
   GetJPAEntityInfo {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = false)]
@@ -91,7 +91,7 @@ pub enum Commands {
     b64_source_code: Option<String>,
   },
   CreateJPAEntityBasicField {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
@@ -131,7 +131,7 @@ pub enum Commands {
     field_large_object: bool,
   },
   CreateJPAEntityIdField {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
@@ -168,7 +168,7 @@ pub enum Commands {
     field_nullable: bool,
   },
   CreateJPAEntityEnumField {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
@@ -196,7 +196,7 @@ pub enum Commands {
     field_unique: bool,
   },
   CreateJPAOneToOneRelationship {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
@@ -227,7 +227,7 @@ pub enum Commands {
     inverse_side_other: Vec<OtherType>,
   },
   CreateJPAManyToOneRelationship {
-    #[arg(long, value_parser = validate_directory, required = true)]
+    #[arg(long, value_parser = validate_directory_secure, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
