@@ -24,8 +24,6 @@ use crate::responses::file_response::FileResponse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-
-
 fn add_to_import_map(
   import_map: &mut HashMap<String, String>,
   package_name: &str,
