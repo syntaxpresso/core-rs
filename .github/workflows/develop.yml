@@ -11,6 +11,8 @@ on:
 jobs:
   # This job runs tests and builds the project
   test-and-build:
+    # Skip this job if the PR is labeled as documentation-only
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -60,6 +62,8 @@ jobs:
 
   # This job builds the native binaries for multiple platforms
   build-native:
+    # Skip this job if the PR is labeled as documentation-only
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     needs: test-and-build
     strategy:
       matrix:
