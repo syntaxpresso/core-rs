@@ -16,22 +16,6 @@ A standalone Rust-based CLI backend for IDE plugins that provides advanced Java 
 
 Syntaxpresso Core is designed as a backend service for IDE plugins, offering comprehensive Java code generation and manipulation through a CLI interface. The tool specializes in JPA (Java Persistence API) entity management, providing developers with automated code generation for complex Java persistence scenarios.
 
-## Architecture
-
-The project is structured for maintainability and extensibility:
-
-```
-src/
-├── commands/           # CLI command implementations
-│   ├── services/       # Business logic services
-│   └── validators/     # Input validation
-├── common/
-│   ├── services/       # Shared services (annotations, imports, etc.)
-│   ├── types/          # Type definitions and configurations
-│   └── utils/          # Utility functions
-└── responses/          # Response type definitions
-```
-
 ## Features
 
 ### 📋 Available Commands
@@ -111,6 +95,27 @@ Error responses follow this format:
 ```
 
 ## Development
+
+### Architecture
+
+The project is structured for maintainability and extensibility:
+
+```
+src/
+├── commands/           # CLI command implementations
+│   ├── services/       # Business logic services
+│   └── validators/     # Input validation
+├── common/
+│   ├── services/       # Shared services (annotations, imports, etc.)
+│   ├── types/          # Type definitions and configurations
+│   └── utils/          # Utility functions
+└── responses/          # Response type definitions
+```
+
+### How it communicates with your IDE
+<div align="center">
+  <img width="500" alt="syntaxpresso-archtecture" src="https://github.com/user-attachments/assets/ddd3cd2d-3f03-4bbf-b855-8fc17248b3c2" />
+</div>
 
 ### Prerequisites
 
