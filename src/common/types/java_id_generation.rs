@@ -25,4 +25,13 @@ impl JavaIdGeneration {
       _ => Err(format!("No matching enum member for value '{}'", value)),
     }
   }
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      JavaIdGeneration::None => "NONE",
+      JavaIdGeneration::Auto => "AUTO",
+      JavaIdGeneration::Identity => "IDENTITY",
+      JavaIdGeneration::Sequence => "SEQUENCE",
+      JavaIdGeneration::Uuid => "UUID",
+    }
+  }
 }
