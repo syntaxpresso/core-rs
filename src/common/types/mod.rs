@@ -1,6 +1,8 @@
 pub mod annotation_types;
 pub mod basic_field_config;
+pub mod cascade_type;
 pub mod enum_field_config;
+pub mod fetch_type;
 pub mod field_types;
 pub mod id_field_config;
 pub mod import_types;
@@ -13,3 +15,6 @@ pub mod java_id_generation;
 pub mod java_id_generation_type;
 pub mod java_source_directory_type;
 pub mod java_visibility_modifier;
+pub mod mapping_type;
+pub mod one_to_one_field_config;
+pub mod other_type;
