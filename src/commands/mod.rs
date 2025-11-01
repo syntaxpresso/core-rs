@@ -18,7 +18,8 @@ use clap::Subcommand;
 
 use crate::{
   commands::validators::{
-    directory_validator::validate_directory_unrestricted, java_class_name_validator::validate_java_class_name,
+    directory_validator::validate_directory_unrestricted,
+    java_class_name_validator::validate_java_class_name,
     package_name_validator::validate_package_name,
   },
   common::types::{

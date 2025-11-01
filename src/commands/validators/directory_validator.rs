@@ -62,17 +62,13 @@ pub fn validate_file_path_within_base(
 /// ```
 pub fn validate_directory_unrestricted(s: &str) -> Result<PathBuf, String> {
   let path = PathBuf::from(s);
-  
   // Basic validation - ensure directory exists and is accessible
   if !path.exists() {
     return Err(format!("Directory does not exist: {}", s));
   }
-  
   if !path.is_dir() {
     return Err(format!("Path is not a directory: {}", s));
   }
-  
   // Canonicalize to resolve any symbolic links and get absolute path
-  path.canonicalize()
-    .map_err(|e| format!("Cannot canonicalize directory path '{}': {}", s, e))
+  path.canonicalize().map_err(|e| format!("Cannot canonicalize directory path '{}': {}", s, e))
 }
