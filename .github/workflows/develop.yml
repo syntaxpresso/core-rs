@@ -1,0 +1,161 @@
+# Name for the workflow
+name: Develop Branch CI
+
+# Controls when the workflow will run
+on:
+  pull_request:
+    branches:
+      - develop
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This job runs tests and builds the project
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo fmt check
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: Build project
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+  # This job builds the native binaries for multiple platforms
+  build-native:
+    needs: test-and-build
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: amd64
+            binary_name: core-rs
+            output_name: syntaxpresso-linux-amd64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            platform: macos
+            arch: amd64
+            binary_name: core-rs
+            output_name: syntaxpresso-macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos
+            arch: arm64
+            binary_name: core-rs
+            output_name: syntaxpresso-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: amd64
+            binary_name: core-rs.exe
+            output_name: syntaxpresso-windows-amd64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cross-compilation dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+
+      - name: Rename binary for platform
+        run: |
+          if [ -f "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" ]; then
+            cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "${{ matrix.output_name }}"
+            echo "Copied ${{ matrix.binary_name }} to ${{ matrix.output_name }}"
+          else
+            echo "Binary ${{ matrix.binary_name }} not found!"
+            ls -la target/${{ matrix.target }}/release/
+            exit 1
+          fi
+        shell: bash
+
+      - name: Make binary executable (Unix)
+        if: matrix.platform != 'windows'
+        run: |
+          chmod +x "${{ matrix.output_name }}"
+          echo "Made ${{ matrix.output_name }} executable"
+
+      - name: Verify renamed binary
+        run: |
+          if [ -f "${{ matrix.output_name }}" ]; then
+            echo "Successfully created ${{ matrix.output_name }}"
+            ls -la "${{ matrix.output_name }}"
+          else
+            echo "Failed to create ${{ matrix.output_name }}"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Upload binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: develop-binary-${{ matrix.platform }}-${{ matrix.arch }}
+          path: ${{ matrix.output_name }}
+          retention-days: 7
