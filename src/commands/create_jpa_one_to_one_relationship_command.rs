@@ -1,7 +1,10 @@
 use std::path::Path;
 
 use crate::{
-  commands::services::create_jpa_one_to_one_relationship_service,
+  commands::{
+    services::create_jpa_one_to_one_relationship_service,
+    validators::directory_validator::validate_file_path_within_base,
+  },
   common::types::one_to_one_field_config::OneToOneFieldConfig,
   responses::{get_files_response::GetFilesResponse, response::Response},
 };
@@ -15,6 +18,16 @@ pub fn execute(
 ) -> Response<GetFilesResponse> {
   let cwd_string = cwd.display().to_string();
   let cmd_name = String::from("create-jpa-one-to-one-relationship");
+  // Security validation: ensure owning side entity file path is within the cwd
+  let file_path_str = owning_side_entity_file_path.display().to_string();
+  if let Err(error_msg) = validate_file_path_within_base(&file_path_str, cwd) {
+    return Response::error(
+      cmd_name,
+      cwd_string,
+      format!("Owning side entity file path security validation failed: {}", error_msg),
+    );
+  }
+
   match create_jpa_one_to_one_relationship_service::run(
     cwd,
     owning_side_entity_file_path,
