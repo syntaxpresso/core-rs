@@ -106,25 +106,25 @@ jobs:
             platform: linux
             arch: amd64
             binary_name: core
-            output_name: syntaxpresso-linux-amd64
+            output_name: syntaxpresso-core-linux-amd64
           - os: macos-13
             target: x86_64-apple-darwin
             platform: macos
             arch: amd64
             binary_name: core
-            output_name: syntaxpresso-macos-amd64
+            output_name: syntaxpresso-core-macos-amd64
           - os: macos-latest
             target: aarch64-apple-darwin
             platform: macos
             arch: arm64
             binary_name: core
-            output_name: syntaxpresso-macos-arm64
+            output_name: syntaxpresso-core-macos-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             platform: windows
             arch: amd64
             binary_name: core.exe
-            output_name: syntaxpresso-windows-amd64.exe
+            output_name: syntaxpresso-core-windows-amd64.exe
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -219,14 +219,14 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release-files
-          cp binaries/binary-linux-amd64/syntaxpresso-linux-amd64 release-files/ || true
-          cp binaries/binary-macos-amd64/syntaxpresso-macos-amd64 release-files/ || true
-          cp binaries/binary-macos-arm64/syntaxpresso-macos-arm64 release-files/ || true
-          cp binaries/binary-windows-amd64/syntaxpresso-windows-amd64.exe release-files/ || true
+          cp binaries/binary-linux-amd64/syntaxpresso-core-linux-amd64 release-files/ || true
+          cp binaries/binary-macos-amd64/syntaxpresso-core-macos-amd64 release-files/ || true
+          cp binaries/binary-macos-arm64/syntaxpresso-core-macos-arm64 release-files/ || true
+          cp binaries/binary-windows-amd64/syntaxpresso-core-windows-amd64.exe release-files/ || true
           # Make Unix binaries executable
-          chmod +x release-files/syntaxpresso-linux-amd64 || true
-          chmod +x release-files/syntaxpresso-macos-amd64 || true
-          chmod +x release-files/syntaxpresso-macos-arm64 || true
+          chmod +x release-files/syntaxpresso-core-linux-amd64 || true
+          chmod +x release-files/syntaxpresso-core-macos-amd64 || true
+          chmod +x release-files/syntaxpresso-core-macos-arm64 || true
           echo "Final release files with permissions:"
           ls -la release-files/
       

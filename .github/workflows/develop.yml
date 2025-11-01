@@ -69,25 +69,25 @@ jobs:
             platform: linux
             arch: amd64
             binary_name: core
-            output_name: syntaxpresso-linux-amd64
+            output_name: syntaxpresso-core-linux-amd64
           - os: macos-13
             target: x86_64-apple-darwin
             platform: macos
             arch: amd64
             binary_name: core
-            output_name: syntaxpresso-macos-amd64
+            output_name: syntaxpresso-core-macos-amd64
           - os: macos-latest
             target: aarch64-apple-darwin
             platform: macos
             arch: arm64
             binary_name: core
-            output_name: syntaxpresso-macos-arm64
+            output_name: syntaxpresso-core-macos-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             platform: windows
             arch: amd64
             binary_name: core.exe
-            output_name: syntaxpresso-windows-amd64.exe
+            output_name: syntaxpresso-core-windows-amd64.exe
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
