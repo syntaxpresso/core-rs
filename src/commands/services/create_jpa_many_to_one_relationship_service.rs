@@ -9,13 +9,15 @@ use crate::common::services::package_declaration_service::{
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_config::AnnotationConfig;
 use crate::common::types::cascade_type::CascadeType;
+
 use crate::common::types::entity_side::EntitySide;
+use crate::common::types::fetch_type::FetchType;
 use crate::common::types::field_types::FieldInsertionPosition;
 use crate::common::types::import_types::ImportInsertionPosition;
 use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
+use crate::common::types::many_to_one_field_config::ManyToOneFieldConfig;
 use crate::common::types::mapping_type::MappingType;
-use crate::common::types::one_to_one_field_config::OneToOneFieldConfig;
 use crate::common::types::other_type::OtherType;
 use crate::common::types::processed_imports::ProcessedImports;
 use crate::common::utils::case_util::{self, CaseType};
@@ -56,31 +58,31 @@ fn find_inverse_entity(cwd: &Path, class_name: &str) -> Result<PathBuf, String> 
       }
     }
   }
-  Err(format!("Entity class '{}' not found in project", class_name))
+  Err(format!("Unable to find entity with class name: {}", class_name))
 }
 
 fn extract_owning_entity_class_name(file_path: &Path) -> Result<String, String> {
-  file_path
-    .file_stem()
-    .and_then(|stem| stem.to_str())
-    .map(|s| s.to_string())
-    .ok_or_else(|| format!("Unable to extract class name from path: {}", file_path.display()))
+  let ts_file = TSFile::from_file(file_path)
+    .map_err(|_| "Unable to parse owning side entity file".to_string())?;
+  ts_file
+    .get_file_name_without_ext()
+    .ok_or_else(|| "Unable to extract owning entity class name".to_string())
 }
 
 fn get_entity_package_name(entity_file_path: &Path) -> Result<String, String> {
-  let ts_file = TSFile::from_file(entity_file_path)
-    .map_err(|_| "Unable to parse entity file for package name".to_string())?;
-  let package_node = get_package_declaration_node(&ts_file)
-    .ok_or_else(|| "Unable to get package declaration from entity".to_string())?;
-  let package_scope_node = get_package_scope_node(&ts_file, package_node);
+  let entity_ts_file =
+    TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse entity file".to_string())?;
+  let package_node = get_package_declaration_node(&entity_ts_file)
+    .ok_or_else(|| "Unable to get entity's package node".to_string())?;
+  let package_scope_node = get_package_scope_node(&entity_ts_file, package_node);
   package_scope_node
-    .and_then(|node| ts_file.get_text_from_node(&node))
-    .map(|s| s.to_string())
-    .ok_or_else(|| "Unable to extract package name from entity".to_string())
+    .and_then(|node| entity_ts_file.get_text_from_node(&node))
+    .map(|text| text.to_string())
+    .ok_or_else(|| "Unable to extract entity package name".to_string())
 }
 
 fn build_annotation_config(
-  field_config: &OneToOneFieldConfig,
+  field_config: &ManyToOneFieldConfig,
   side: EntitySide,
   mapped_by_field_name: Option<String>,
 ) -> AnnotationConfig {
@@ -94,23 +96,38 @@ fn build_annotation_config(
   };
   let is_owning_side = side == EntitySide::Owning;
   let is_unidirectional = field_config.mapping_type == Some(MappingType::UnidirectionalJoinColumn);
-  AnnotationConfig::new_one_to_one(
+  AnnotationConfig::new_many_to_one(
     is_owning_side,
     cascades,
     other_options,
     if is_owning_side || is_unidirectional { None } else { mapped_by_field_name },
     is_owning_side || is_unidirectional,
+    field_config.fetch_type.clone(),
+    field_config.collection_type.clone(),
   )
 }
 
 fn process_imports(
-  _field_config: &OneToOneFieldConfig,
+  _field_config: &ManyToOneFieldConfig,
   target_entity_type: &str,
   target_entity_file_path: &Path,
   annotation_config: &AnnotationConfig,
 ) -> Result<ProcessedImports, String> {
   let mut jpa_imports = Vec::new();
-  jpa_imports.push(("jakarta.persistence".to_string(), "OneToOne".to_string()));
+  if annotation_config.is_owning_side {
+    jpa_imports.push(("jakarta.persistence".to_string(), "ManyToOne".to_string()));
+  } else {
+    jpa_imports.push(("jakarta.persistence".to_string(), "OneToMany".to_string()));
+    jpa_imports.push((
+      "java.util".to_string(),
+      annotation_config.get_collection_type().unwrap().as_java_type().to_string(),
+    ));
+  }
+  if let Some(fetch_type) = annotation_config.get_fetch_type()
+    && *fetch_type != FetchType::None
+  {
+    jpa_imports.push(("jakarta.persistence".to_string(), "FetchType".to_string()));
+  }
   if annotation_config.needs_join_column {
     jpa_imports.push(("jakarta.persistence".to_string(), "JoinColumn".to_string()));
   }
@@ -130,15 +147,9 @@ fn build_cascade_param(cascades: &[CascadeType]) -> Option<String> {
   if cascades.is_empty() {
     return None;
   }
-  if cascades.len() == 5 {
-    return Some("CascadeType.ALL".to_string());
-  }
-  if cascades.len() == 1 {
-    return Some(format!("CascadeType.{}", cascades[0].as_str()));
-  }
-  let cascade_list =
-    cascades.iter().map(|c| format!("CascadeType.{}", c.as_str())).collect::<Vec<_>>().join(", ");
-  Some(format!("{{{}}}", cascade_list))
+  let cascade_values: Vec<String> =
+    cascades.iter().map(|cascade| format!("CascadeType.{}", cascade.as_str())).collect();
+  Some(format!("{{{}}}", cascade_values.join(", ")))
 }
 
 fn add_relationship_field(
@@ -148,41 +159,69 @@ fn add_relationship_field(
   annotation_config: &AnnotationConfig,
 ) -> Result<(), String> {
   let public_class_node = get_public_class_node(ts_file)
-    .ok_or_else(|| "Unable to get public class node from Entity".to_string())?;
+    .ok_or_else(|| "Unable to get JPA Entity's public class node".to_string())?;
   let public_class_node_start_byte = public_class_node.start_byte();
-  let field_name_camel_case = case_util::auto_convert_case(field_name, CaseType::Camel);
-  let target_field_name_snake_case =
-    case_util::auto_convert_case(target_entity_type, CaseType::Snake);
+  let target_field_name_snake_case = case_util::auto_convert_case(field_name, CaseType::Snake);
+  let field_type = if annotation_config.is_owning_side {
+    target_entity_type.to_string()
+  } else {
+    format!(
+      "{}<{}>",
+      annotation_config.get_collection_type().unwrap().as_java_type(),
+      target_entity_type
+    )
+  };
   let params = AddFieldDeclarationParams {
     insertion_position: FieldInsertionPosition::EndOfClassBody,
     visibility_modifier: JavaVisibilityModifier::Private,
     field_modifiers: vec![],
-    field_type: target_entity_type,
-    field_name: &field_name_camel_case,
+    field_type: &field_type,
+    field_name: &target_field_name_snake_case,
     field_initialization: None,
   };
   add_field_declaration(ts_file, public_class_node_start_byte, params, |builder| {
-    builder.add_annotation("@OneToOne")?;
-    if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
-      builder.with_argument("@OneToOne", "cascade", &cascade_param)?;
-    }
-    let is_mandatory = annotation_config.other_options.contains(&OtherType::Mandatory);
-    if !is_mandatory {
-      builder.with_argument("@OneToOne", "optional", "true")?;
+    if annotation_config.is_owning_side {
+      builder.add_annotation("@ManyToOne")?;
+      if let Some(fetch_type) = annotation_config.get_fetch_type()
+        && *fetch_type != FetchType::None
+      {
+        builder.with_argument(
+          "@ManyToOne",
+          "fetch",
+          &format!("FetchType.{}", fetch_type.as_str()),
+        )?;
+      }
+      if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
+        builder.with_argument("@ManyToOne", "cascade", &cascade_param)?;
+      }
+      let is_mandatory = annotation_config.other_options.contains(&OtherType::Mandatory);
+      if !is_mandatory {
+        builder.with_argument("@ManyToOne", "optional", "true")?;
+      } else {
+        builder.with_argument("@ManyToOne", "optional", "false")?;
+      }
     } else {
-      builder.with_argument("@OneToOne", "optional", "false")?;
-    }
-    if annotation_config.other_options.contains(&OtherType::OrphanRemoval) {
-      builder.with_argument("@OneToOne", "orphanRemoval", "true")?;
-    }
-    if let Some(ref mapped_by_field) = annotation_config.mapped_by_field {
-      let mapped_by_snake_case = case_util::auto_convert_case(mapped_by_field, CaseType::Snake);
-      builder.with_argument("@OneToOne", "mappedBy", &format!("\"{}\"", mapped_by_snake_case))?;
+      builder.add_annotation("@OneToMany")?;
+      if let Some(ref mapped_by_field) = annotation_config.mapped_by_field {
+        let mapped_by_snake_case = case_util::auto_convert_case(mapped_by_field, CaseType::Snake);
+        builder.with_argument(
+          "@OneToMany",
+          "mappedBy",
+          &format!("\"{}\"", mapped_by_snake_case),
+        )?;
+      }
+      if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
+        builder.with_argument("@OneToMany", "cascade", &cascade_param)?;
+      }
+      if annotation_config.other_options.contains(&OtherType::OrphanRemoval) {
+        builder.with_argument("@OneToMany", "orphanRemoval", "true")?;
+      }
     }
     if annotation_config.needs_join_column {
       builder.add_annotation("@JoinColumn")?;
       let column_name = format!("{}_id", target_field_name_snake_case);
       builder.with_argument("@JoinColumn", "name", &format!("\"{}\"", column_name))?;
+      let is_mandatory = annotation_config.other_options.contains(&OtherType::Mandatory);
       if is_mandatory {
         builder.with_argument("@JoinColumn", "nullable", "false")?;
       } else {
@@ -199,7 +238,7 @@ fn add_relationship_field(
   Ok(())
 }
 
-fn is_bidirectional_mapping(field_config: &OneToOneFieldConfig) -> bool {
+fn is_bidirectional_mapping(field_config: &ManyToOneFieldConfig) -> bool {
   field_config.mapping_type != Some(MappingType::UnidirectionalJoinColumn)
 }
 
@@ -208,7 +247,7 @@ fn process_owning_side_entity(
   field_name: &str,
   target_entity_type: &str,
   target_entity_file_path: &Path,
-  field_config: &OneToOneFieldConfig,
+  field_config: &ManyToOneFieldConfig,
 ) -> Result<FileResponse, String> {
   process_entity_side(
     entity_file_path,
@@ -226,7 +265,7 @@ fn process_inverse_side_entity(
   field_name: &str,
   target_entity_type: &str,
   target_entity_file_path: &Path,
-  field_config: &OneToOneFieldConfig,
+  field_config: &ManyToOneFieldConfig,
   mapped_by_field_name: Option<String>,
 ) -> Result<FileResponse, String> {
   process_entity_side(
@@ -245,7 +284,7 @@ fn process_entity_side(
   field_name: &str,
   target_entity_type: &str,
   target_entity_file_path: &Path,
-  field_config: &OneToOneFieldConfig,
+  field_config: &ManyToOneFieldConfig,
   side: EntitySide,
   mapped_by_field_name: Option<String>,
 ) -> Result<FileResponse, String> {
@@ -285,13 +324,13 @@ pub fn run(
   owning_side_entity_file_path: &Path,
   owning_side_field_name: &str,
   inverse_side_field_name: &str,
-  field_config: &OneToOneFieldConfig,
+  field_config: &ManyToOneFieldConfig,
 ) -> Result<Vec<FileResponse>, String> {
   // Step 1: Find inverse entity by class name
   let inverse_entity_file_path = find_inverse_entity(cwd, &field_config.inverse_field_type)?;
   // Step 2: Extract owning entity class name for inverse side
   let owning_entity_class_name = extract_owning_entity_class_name(owning_side_entity_file_path)?;
-  // Step 3: Process owning side entity
+  // Step 3: Process owning side entity (ManyToOne side)
   let owning_response = process_owning_side_entity(
     owning_side_entity_file_path,
     owning_side_field_name,
@@ -300,7 +339,7 @@ pub fn run(
     field_config,
   )?;
   let mut responses = vec![owning_response];
-  // Step 4: Process inverse side entity (if bidirectional)
+  // Step 4: Process inverse side entity (OneToMany side) if bidirectional
   if is_bidirectional_mapping(field_config) {
     let inverse_response = process_inverse_side_entity(
       &inverse_entity_file_path,
@@ -312,6 +351,5 @@ pub fn run(
     )?;
     responses.push(inverse_response);
   }
-  // Step 5: Return processed file responses
   Ok(responses)
 }
