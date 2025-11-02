@@ -97,7 +97,7 @@ impl TSFile {
     start_byte: usize,
     old_end_byte: usize,
     _start_position: Point, // Kept for API compatibility, but we calculate internally
-    _old_end_position: Point, // Kept for API compatibility, but we calculate internally  
+    _old_end_position: Point, // Kept for API compatibility, but we calculate internally
     new_text: &str,
   ) -> bool {
     self.apply_incremental_edit(start_byte, old_end_byte, new_text)
@@ -336,7 +336,7 @@ impl TSFile {
     let old_end_position = self.byte_position_to_point(end_byte);
     let new_end_position = self.calculate_new_position(start_byte, new_text);
     let new_end_byte = start_byte + new_text.len();
-    
+
     if let Some(tree) = &mut self.tree {
       // Create edit descriptor for tree-sitter
       let edit = InputEdit {
@@ -347,13 +347,13 @@ impl TSFile {
         old_end_position,
         new_end_position,
       };
-      
+
       // Tell tree about the edit BEFORE changing source
       tree.edit(&edit);
-      
+
       // Apply the text change
       self.source_code.replace_range(start_byte..end_byte, new_text);
-      
+
       // Incremental re-parse (much faster than full reparse!)
       self.tree = self.parser.parse(&self.source_code, Some(tree));
       self.modified = true;
