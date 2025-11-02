@@ -20,7 +20,7 @@ public class UserService {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("UserService.java"));
-    
+
     if let Some(class_node) = find_class_node_by_name(&ts_file, "UserService") {
       assert_eq!(class_node.kind(), "class_declaration");
       // Verify we can get text from the found node
@@ -48,7 +48,7 @@ public class ThirdClass extends FirstClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     // Test finding each class
     if let Some(first_class) = find_class_node_by_name(&ts_file, "FirstClass") {
       assert_eq!(first_class.kind(), "class_declaration");
@@ -88,7 +88,7 @@ public class UserService {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("UserService.java"));
-    
+
     let result = find_class_node_by_name(&ts_file, "NonExistentClass");
     assert!(result.is_none());
   }
@@ -97,7 +97,7 @@ public class UserService {
   fn test_find_class_node_by_name_empty_file() {
     let content = "";
     let ts_file = create_ts_file_from_content(content, Some("Empty.java"));
-    
+
     let result = find_class_node_by_name(&ts_file, "AnyClass");
     assert!(result.is_none());
   }
@@ -113,7 +113,7 @@ package com.example;
 import java.util.List;
 "#;
     let ts_file = create_ts_file_from_content(content, Some("NoClasses.java"));
-    
+
     let result = find_class_node_by_name(&ts_file, "AnyClass");
     assert!(result.is_none());
   }
@@ -126,10 +126,10 @@ public class UserService {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("UserService.java"));
-    
+
     // Exact match should work
     assert!(find_class_node_by_name(&ts_file, "UserService").is_some());
-    
+
     // Case variations should not match
     assert!(find_class_node_by_name(&ts_file, "userservice").is_none());
     assert!(find_class_node_by_name(&ts_file, "USERSERVICE").is_none());
@@ -153,7 +153,7 @@ public class AnotherPublicClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("UserService.java"));
-    
+
     if let Some(class_node) = get_public_class_node(&ts_file) {
       assert_eq!(class_node.kind(), "class_declaration");
       if let Some(text) = ts_file.get_text_from_node(&class_node) {
@@ -180,7 +180,7 @@ public class SecondPublicClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("NonMatchingFileName.java"));
-    
+
     if let Some(class_node) = get_public_class_node(&ts_file) {
       assert_eq!(class_node.kind(), "class_declaration");
       if let Some(text) = ts_file.get_text_from_node(&class_node) {
@@ -203,7 +203,7 @@ public class OnlyPublicClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, None);
-    
+
     if let Some(class_node) = get_public_class_node(&ts_file) {
       assert_eq!(class_node.kind(), "class_declaration");
       if let Some(text) = ts_file.get_text_from_node(&class_node) {
@@ -226,7 +226,7 @@ public class OnlyPublicClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some(""));
-    
+
     if let Some(class_node) = get_public_class_node(&ts_file) {
       assert_eq!(class_node.kind(), "class_declaration");
       if let Some(text) = ts_file.get_text_from_node(&class_node) {
@@ -249,7 +249,7 @@ class AnotherPrivateClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     let result = get_public_class_node(&ts_file);
     assert!(result.is_none());
   }
@@ -266,12 +266,15 @@ class PackagePrivateClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("PackagePrivateClass.java"));
-    
+
     // get_public_class_node() should return None for package-private classes
     // because get_file_name_without_ext() returns None when using from_source_code()
     // and get_first_public_class_node() only finds classes with explicit 'public' modifier
-    let result = get_public_class_node(&ts_file);  
-    assert!(result.is_none(), "Expected None for package-private class without explicit public modifier");
+    let result = get_public_class_node(&ts_file);
+    assert!(
+      result.is_none(),
+      "Expected None for package-private class without explicit public modifier"
+    );
   }
 
   #[test]
@@ -290,20 +293,20 @@ public class ThirdClass extends FirstClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     let all_classes = get_all_class_declaration_nodes(&ts_file);
     assert_eq!(all_classes.len(), 3);
-    
+
     // Check that we have the expected class names
     let mut found_names = Vec::new();
     for class_map in &all_classes {
-      if let Some(class_name_node) = class_map.get("className") {
-        if let Some(name) = ts_file.get_text_from_node(class_name_node) {
-          found_names.push(name);
-        }
+      if let Some(class_name_node) = class_map.get("className")
+        && let Some(name) = ts_file.get_text_from_node(class_name_node)
+      {
+        found_names.push(name);
       }
     }
-    
+
     found_names.sort();
     assert_eq!(found_names, vec!["FirstClass", "SecondClass", "ThirdClass"]);
   }
@@ -320,14 +323,14 @@ public class SingleClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("SingleClass.java"));
-    
+
     let all_classes = get_all_class_declaration_nodes(&ts_file);
     assert_eq!(all_classes.len(), 1);
-    
-    if let Some(class_name_node) = all_classes[0].get("className") {
-      if let Some(name) = ts_file.get_text_from_node(class_name_node) {
-        assert_eq!(name, "SingleClass");
-      }
+
+    if let Some(class_name_node) = all_classes[0].get("className")
+      && let Some(name) = ts_file.get_text_from_node(class_name_node)
+    {
+      assert_eq!(name, "SingleClass");
     }
   }
 
@@ -340,7 +343,7 @@ import java.util.List;
 // No classes here
 "#;
     let ts_file = create_ts_file_from_content(content, Some("NoClasses.java"));
-    
+
     let all_classes = get_all_class_declaration_nodes(&ts_file);
     assert_eq!(all_classes.len(), 0);
   }
@@ -349,7 +352,7 @@ import java.util.List;
   fn test_get_all_class_declaration_nodes_empty_file() {
     let content = "";
     let ts_file = create_ts_file_from_content(content, Some("Empty.java"));
-    
+
     let all_classes = get_all_class_declaration_nodes(&ts_file);
     assert_eq!(all_classes.len(), 0);
   }
@@ -370,19 +373,19 @@ public class OuterClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("OuterClass.java"));
-    
+
     let all_classes = get_all_class_declaration_nodes(&ts_file);
     assert_eq!(all_classes.len(), 3); // OuterClass, InnerClass, StaticNestedClass
-    
+
     let mut found_names = Vec::new();
     for class_map in &all_classes {
-      if let Some(class_name_node) = class_map.get("className") {
-        if let Some(name) = ts_file.get_text_from_node(class_name_node) {
-          found_names.push(name);
-        }
+      if let Some(class_name_node) = class_map.get("className")
+        && let Some(name) = ts_file.get_text_from_node(class_name_node)
+      {
+        found_names.push(name);
       }
     }
-    
+
     found_names.sort();
     assert_eq!(found_names, vec!["InnerClass", "OuterClass", "StaticNestedClass"]);
   }
@@ -395,7 +398,7 @@ public class UserService {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("UserService.java"));
-    
+
     if let Some(class_node) = find_class_node_by_name(&ts_file, "UserService") {
       if let Some(name_node) = get_class_declaration_name_node(&ts_file, class_node) {
         assert_eq!(name_node.kind(), "identifier");
@@ -422,7 +425,7 @@ class SecondClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     // Test first class
     if let Some(first_class) = find_class_node_by_name(&ts_file, "FirstClass") {
       if let Some(name_node) = get_class_declaration_name_node(&ts_file, first_class) {
@@ -433,7 +436,7 @@ class SecondClass {
         panic!("Expected to find FirstClass name node");
       }
     }
-    
+
     // Test second class
     if let Some(second_class) = find_class_node_by_name(&ts_file, "SecondClass") {
       if let Some(name_node) = get_class_declaration_name_node(&ts_file, second_class) {
@@ -458,15 +461,15 @@ public class UserService {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("UserService.java"));
-    
+
     // Get a non-class node (e.g., method declaration)
     let query_string = r#"(method_declaration) @method"#;
-    if let Ok(result) = ts_file.query_builder(query_string).returning("method").execute() {
-      if let Some(method_node) = result.first_node() {
-        // Should return None for non-class-declaration nodes
-        let name_result = get_class_declaration_name_node(&ts_file, method_node);
-        assert!(name_result.is_none());
-      }
+    if let Ok(result) = ts_file.query_builder(query_string).returning("method").execute()
+      && let Some(method_node) = result.first_node()
+    {
+      // Should return None for non-class-declaration nodes
+      let name_result = get_class_declaration_name_node(&ts_file, method_node);
+      assert!(name_result.is_none());
     }
   }
 
@@ -482,13 +485,13 @@ public class DerivedClass extends BaseClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     // Test base class (no superclass)
     if let Some(base_class) = find_class_node_by_name(&ts_file, "BaseClass") {
       let superclass_result = get_class_superclass_name_node(&ts_file, base_class);
       assert!(superclass_result.is_none());
     }
-    
+
     // Test derived class (has superclass)
     if let Some(derived_class) = find_class_node_by_name(&ts_file, "DerivedClass") {
       if let Some(superclass_node) = get_class_superclass_name_node(&ts_file, derived_class) {
@@ -516,7 +519,7 @@ public class StandaloneClass {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("StandaloneClass.java"));
-    
+
     if let Some(class_node) = find_class_node_by_name(&ts_file, "StandaloneClass") {
       let superclass_result = get_class_superclass_name_node(&ts_file, class_node);
       assert!(superclass_result.is_none());
@@ -541,13 +544,13 @@ public class Child extends Parent {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     // Test each class in the inheritance chain
     if let Some(grandparent) = find_class_node_by_name(&ts_file, "GrandParent") {
       let superclass_result = get_class_superclass_name_node(&ts_file, grandparent);
       assert!(superclass_result.is_none());
     }
-    
+
     if let Some(parent) = find_class_node_by_name(&ts_file, "Parent") {
       if let Some(superclass_node) = get_class_superclass_name_node(&ts_file, parent) {
         if let Some(superclass_name) = ts_file.get_text_from_node(&superclass_node) {
@@ -557,7 +560,7 @@ public class Child extends Parent {
         panic!("Expected Parent to extend GrandParent");
       }
     }
-    
+
     if let Some(child) = find_class_node_by_name(&ts_file, "Child") {
       if let Some(superclass_node) = get_class_superclass_name_node(&ts_file, child) {
         if let Some(superclass_name) = ts_file.get_text_from_node(&superclass_node) {
@@ -581,7 +584,7 @@ public class ConcreteChild extends GenericParent<String> {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("Test.java"));
-    
+
     if let Some(child_class) = find_class_node_by_name(&ts_file, "ConcreteChild") {
       // Note: This tests what tree-sitter actually parses for generic types
       // The superclass name should be just the base type identifier
@@ -589,7 +592,7 @@ public class ConcreteChild extends GenericParent<String> {
       // but generic inheritance might have a different tree structure
       // Let's test what actually happens - it might return None for generic types
       let superclass_result = get_class_superclass_name_node(&ts_file, child_class);
-      
+
       // If tree-sitter parses generic superclass differently, the function might return None
       // This test documents the actual behavior rather than assuming expected behavior
       if let Some(superclass_node) = superclass_result {
@@ -616,7 +619,7 @@ public class { // Missing class name
 } // Missing semicolon
 "#;
     let ts_file = create_ts_file_from_content(invalid_content, Some("Invalid.java"));
-    
+
     // Functions should handle parsing failures gracefully
     assert!(find_class_node_by_name(&ts_file, "AnyClass").is_none());
     assert!(get_public_class_node(&ts_file).is_none());
@@ -642,32 +645,28 @@ public class UserService {
 }
 "#;
     let ts_file = create_ts_file_from_content(content, Some("User.java"));
-    
+
     // Should still find classes despite annotations
     if let Some(user_class) = find_class_node_by_name(&ts_file, "User") {
-      if let Some(name_node) = get_class_declaration_name_node(&ts_file, user_class) {
-        if let Some(name) = ts_file.get_text_from_node(&name_node) {
-          assert_eq!(name, "User");
-        }
+      if let Some(name_node) = get_class_declaration_name_node(&ts_file, user_class)
+        && let Some(name) = ts_file.get_text_from_node(&name_node)
+      {
+        assert_eq!(name, "User");
       }
     } else {
       panic!("Expected to find User class with annotations");
     }
-    
-    if let Some(service_class) = find_class_node_by_name(&ts_file, "UserService") {
-      if let Some(name_node) = get_class_declaration_name_node(&ts_file, service_class) {
-        if let Some(name) = ts_file.get_text_from_node(&name_node) {
-          assert_eq!(name, "UserService");
-        }
-      }
+
+    if let Some(service_class) = find_class_node_by_name(&ts_file, "UserService")
+      && let Some(name_node) = get_class_declaration_name_node(&ts_file, service_class)
+      && let Some(name) = ts_file.get_text_from_node(&name_node)
+    {
+      assert_eq!(name, "UserService");
     } else {
       panic!("Expected to find UserService class with annotations");
     }
-    
 
-    
     let all_classes = get_all_class_declaration_nodes(&ts_file);
     assert_eq!(all_classes.len(), 2);
   }
 }
-
