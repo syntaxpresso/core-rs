@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod field_declaration_service_tests {
-  use syntaxpresso_core::common::services::field_declaration_service::*;
   use syntaxpresso_core::common::services::class_declaration_service::find_class_node_by_name;
+  use syntaxpresso_core::common::services::field_declaration_service::*;
   use syntaxpresso_core::common::ts_file::TSFile;
 
   fn create_ts_file(content: &str) -> TSFile {
@@ -33,10 +33,10 @@ public class User {
     if let Some(class_node) = find_class_node_by_name(&ts_file, "User") {
       let id_field = find_field_declaration_node_by_name(&ts_file, "id", class_node);
       assert!(id_field.is_some(), "Should find 'id' field");
-      
+
       let username_field = find_field_declaration_node_by_name(&ts_file, "username", class_node);
       assert!(username_field.is_some(), "Should find 'username' field");
-      
+
       let nonexistent = find_field_declaration_node_by_name(&ts_file, "nonexistent", class_node);
       assert!(nonexistent.is_none(), "Should not find nonexistent field");
     }
@@ -52,18 +52,22 @@ public class User {
       let string_fields = find_field_declaration_nodes_by_type(&ts_file, "String", class_node);
       let int_fields = find_field_declaration_nodes_by_type(&ts_file, "int", class_node);
       let double_fields = find_field_declaration_nodes_by_type(&ts_file, "double", class_node);
-      
+
       // The function seems to return all fields (4) for any type query
       // This suggests there's a bug in the query logic
       // For now, we'll test that it returns a non-empty result for existing types
-      assert!(long_fields.len() > 0, "Should find at least 1 field when searching for Long");
-      assert!(string_fields.len() > 0, "Should find at least 1 field when searching for String");  
-      assert!(int_fields.len() > 0, "Should find at least 1 field when searching for int");
-      assert!(double_fields.len() > 0, "Should find at least 1 field when searching for double");
-      
-      let nonexistent_fields = find_field_declaration_nodes_by_type(&ts_file, "BigDecimal", class_node);
+      assert!(!long_fields.is_empty(), "Should find at least 1 field when searching for Long");
+      assert!(!string_fields.is_empty(), "Should find at least 1 field when searching for String");
+      assert!(!int_fields.is_empty(), "Should find at least 1 field when searching for int");
+      assert!(!double_fields.is_empty(), "Should find at least 1 field when searching for double");
+
+      let nonexistent_fields =
+        find_field_declaration_nodes_by_type(&ts_file, "BigDecimal", class_node);
       // This might also return all fields due to the bug, but let's test that it doesn't crash
-      assert!(nonexistent_fields.len() <= 10, "Should return a reasonable number of results for non-existent type");
+      assert!(
+        nonexistent_fields.len() <= 10,
+        "Should return a reasonable number of results for non-existent type"
+      );
     }
   }
 
@@ -114,7 +118,7 @@ public class Product {
           assert_eq!(type_text, Some("Long"), "Type should be 'Long'");
         }
       }
-      
+
       if let Some(name_field) = find_field_declaration_node_by_name(&ts_file, "name", class_node) {
         let type_node = get_field_declaration_type_node(&ts_file, name_field);
         assert!(type_node.is_some(), "Should find type node for name field");
@@ -138,8 +142,10 @@ public class Product {
           assert_eq!(name_text, Some("id"), "Field name should be 'id'");
         }
       }
-      
-      if let Some(reviews_field) = find_field_declaration_node_by_name(&ts_file, "reviews", class_node) {
+
+      if let Some(reviews_field) =
+        find_field_declaration_node_by_name(&ts_file, "reviews", class_node)
+      {
         let name_node = get_field_declaration_name_node(&ts_file, reviews_field);
         assert!(name_node.is_some(), "Should find name node for reviews field");
         if let Some(name_node) = name_node {
@@ -155,30 +161,42 @@ public class Product {
     let ts_file = create_ts_file(COMPLEX_JAVA_CLASS);
     if let Some(class_node) = find_class_node_by_name(&ts_file, "Product") {
       // Test field with initialization
-      if let Some(price_field) = find_field_declaration_node_by_name(&ts_file, "price", class_node) {
+      if let Some(price_field) = find_field_declaration_node_by_name(&ts_file, "price", class_node)
+      {
         let value_node = get_field_declaration_value_node(&ts_file, price_field);
         assert!(value_node.is_some(), "Should find value node for price field");
         if let Some(value_node) = value_node {
           let value_text = ts_file.get_text_from_node(&value_node);
           assert!(value_text.is_some(), "Should have value text");
-          assert!(value_text.unwrap().contains("BigDecimal"), "Value should contain BigDecimal constructor");
+          assert!(
+            value_text.unwrap().contains("BigDecimal"),
+            "Value should contain BigDecimal constructor"
+          );
         }
       }
-      
-      if let Some(reviews_field) = find_field_declaration_node_by_name(&ts_file, "reviews", class_node) {
+
+      if let Some(reviews_field) =
+        find_field_declaration_node_by_name(&ts_file, "reviews", class_node)
+      {
         let value_node = get_field_declaration_value_node(&ts_file, reviews_field);
         assert!(value_node.is_some(), "Should find value node for reviews field");
         if let Some(value_node) = value_node {
           let value_text = ts_file.get_text_from_node(&value_node);
           assert!(value_text.is_some(), "Should have value text");
-          assert!(value_text.unwrap().contains("ArrayList"), "Value should contain ArrayList constructor");
+          assert!(
+            value_text.unwrap().contains("ArrayList"),
+            "Value should contain ArrayList constructor"
+          );
         }
       }
-      
+
       // Test field without initialization
       if let Some(id_field) = find_field_declaration_node_by_name(&ts_file, "id", class_node) {
         let value_node = get_field_declaration_value_node(&ts_file, id_field);
-        assert!(value_node.is_none(), "Should not find value node for id field (no initialization)");
+        assert!(
+          value_node.is_none(),
+          "Should not find value node for id field (no initialization)"
+        );
       }
     }
   }
@@ -234,14 +252,14 @@ public class UserService {
     if let Some(class_node) = find_class_node_by_name(&ts_file, "UserService") {
       if let Some(name_field) = find_field_declaration_node_by_name(&ts_file, "name", class_node) {
         let usage_nodes = get_all_field_declaration_usage_nodes(&ts_file, name_field, class_node);
-        // Should find usages like "this.name" 
-        assert!(usage_nodes.len() >= 1, "Should find at least 1 usage of name field");
+        // Should find usages like "this.name"
+        assert!(!usage_nodes.is_empty(), "Should find at least 1 usage of name field");
       }
-      
+
       if let Some(user_field) = find_field_declaration_node_by_name(&ts_file, "user", class_node) {
         let usage_nodes = get_all_field_declaration_usage_nodes(&ts_file, user_field, class_node);
         // Should find usages like "user.name"
-        assert!(usage_nodes.len() >= 1, "Should find at least 1 usage of user field");
+        assert!(!usage_nodes.is_empty(), "Should find at least 1 usage of user field");
       }
     }
   }
@@ -250,15 +268,15 @@ public class UserService {
   #[test]
   fn test_edge_cases_empty_tree() {
     let ts_file = create_ts_file("");
-    
+
     // Test with empty tree
     let empty_node = ts_file.tree.as_ref().unwrap().root_node();
     let fields = get_all_field_declaration_nodes(&ts_file, empty_node);
     assert_eq!(fields.len(), 0, "Should return empty vector for empty tree");
-    
+
     let field_by_name = find_field_declaration_node_by_name(&ts_file, "test", empty_node);
     assert!(field_by_name.is_none(), "Should return None for empty tree");
-    
+
     let fields_by_type = find_field_declaration_nodes_by_type(&ts_file, "String", empty_node);
     assert_eq!(fields_by_type.len(), 0, "Should return empty vector for empty tree");
   }
@@ -270,14 +288,14 @@ public class UserService {
       // Test with empty field name
       let empty_name = find_field_declaration_node_by_name(&ts_file, "", class_node);
       assert!(empty_name.is_none(), "Should return None for empty field name");
-      
+
       let whitespace_name = find_field_declaration_node_by_name(&ts_file, "   ", class_node);
       assert!(whitespace_name.is_none(), "Should return None for whitespace field name");
-      
+
       // Test with empty type
       let empty_type = find_field_declaration_nodes_by_type(&ts_file, "", class_node);
       assert_eq!(empty_type.len(), 0, "Should return empty vector for empty type");
-      
+
       let whitespace_type = find_field_declaration_nodes_by_type(&ts_file, "   ", class_node);
       assert_eq!(whitespace_type.len(), 0, "Should return empty vector for whitespace type");
     }
@@ -286,28 +304,47 @@ public class UserService {
   #[test]
   fn test_edge_cases_wrong_node_types() {
     let ts_file = create_ts_file(COMPLEX_JAVA_CLASS);
-    if let Some(class_node) = find_class_node_by_name(&ts_file, "Product") {
-      if let Some(id_field) = find_field_declaration_node_by_name(&ts_file, "id", class_node) {
+    if let Some(class_node) = find_class_node_by_name(&ts_file, "Product") 
+      && let Some(id_field) = find_field_declaration_node_by_name(&ts_file, "id", class_node) {
         // Test functions that expect field_declaration with class_declaration node
         let type_node = get_field_declaration_type_node(&ts_file, class_node);
-        assert!(type_node.is_none(), "Should return None when passing class_declaration to field function");
-        
+        assert!(
+          type_node.is_none(),
+          "Should return None when passing class_declaration to field function"
+        );
+
         let name_node = get_field_declaration_name_node(&ts_file, class_node);
-        assert!(name_node.is_none(), "Should return None when passing class_declaration to field function");
-        
+        assert!(
+          name_node.is_none(),
+          "Should return None when passing class_declaration to field function"
+        );
+
         let value_node = get_field_declaration_value_node(&ts_file, class_node);
-        assert!(value_node.is_none(), "Should return None when passing class_declaration to field function");
-        
+        assert!(
+          value_node.is_none(),
+          "Should return None when passing class_declaration to field function"
+        );
+
         // Test functions that expect class_declaration with field_declaration node
         let all_fields = get_all_field_declaration_nodes(&ts_file, id_field);
-        assert_eq!(all_fields.len(), 0, "Should return empty vector when passing field_declaration to class function");
-        
+        assert_eq!(
+          all_fields.len(),
+          0,
+          "Should return empty vector when passing field_declaration to class function"
+        );
+
         let all_methods = get_all_method_declaration_nodes(&ts_file, id_field);
-        assert_eq!(all_methods.len(), 0, "Should return empty vector when passing field_declaration to class function");
-        
+        assert_eq!(
+          all_methods.len(),
+          0,
+          "Should return empty vector when passing field_declaration to class function"
+        );
+
         let class_body = get_class_body_node(&ts_file, id_field);
-        assert!(class_body.is_none(), "Should return None when passing field_declaration to class function");
+        assert!(
+          class_body.is_none(),
+          "Should return None when passing field_declaration to class function"
+        );
       }
-    }
   }
 }
