@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 /// A security validator that ensures all file operations stay within a designated base directory.
 /// This prevents path traversal attacks and ensures files can only be created/modified within
 /// the allowed directory scope.
+#[derive(Debug)]
 pub struct PathSecurityValidator {
   base_path: PathBuf,
 }
@@ -24,7 +25,6 @@ fn log_security_event(event: &SecurityEvent) {
     .duration_since(std::time::UNIX_EPOCH)
     .unwrap_or_else(|_| std::time::Duration::from_secs(0))
     .as_secs();
-
   match event {
     SecurityEvent::PathValidationSuccess { target_path, base_path } => {
       eprintln!(
@@ -65,20 +65,21 @@ impl PathSecurityValidator {
   /// * `Err(String)` - If the base path cannot be canonicalized or accessed
   ///
   /// # Examples
-  /// ```
-  /// use std::path::Path;
-  /// use crate::common::utils::path_security_util::PathSecurityValidator;
-  ///
-  /// let validator = PathSecurityValidator::new(Path::new("/project/root"))?;
-  /// ```
+   /// ```
+   /// use std::path::Path;
+   /// use syntaxpresso_core::common::utils::path_security_util::PathSecurityValidator;
+   /// 
+   /// # fn main() -> Result<(), String> {
+   /// let validator = PathSecurityValidator::new(Path::new("/tmp"))?;
+   /// # Ok(())
+   /// # }
+   /// ```
   pub fn new(base_path: &Path) -> Result<Self, String> {
     let canonical_base = fs::canonicalize(base_path)
       .map_err(|e| format!("Cannot canonicalize base path '{}': {}", base_path.display(), e))?;
-
     if !canonical_base.is_dir() {
       return Err(format!("Base path '{}' is not a directory", canonical_base.display()));
     }
-
     Ok(Self { base_path: canonical_base })
   }
 
@@ -100,10 +101,16 @@ impl PathSecurityValidator {
   /// - Blocks absolute paths that escape the base directory
   ///
   /// # Examples
-  /// ```
-  /// let validator = PathSecurityValidator::new(Path::new("/project"))?;
-  /// let safe_path = validator.validate_path_containment(Path::new("src/main.rs"))?;
-  /// ```
+   /// ```
+   /// use std::path::Path;
+   /// use syntaxpresso_core::common::utils::path_security_util::PathSecurityValidator;
+   /// 
+   /// # fn main() -> Result<(), String> {
+   /// let validator = PathSecurityValidator::new(Path::new("/tmp"))?;
+   /// let safe_path = validator.validate_path_containment(Path::new("src/main.rs"))?;
+   /// # Ok(())
+   /// # }
+   /// ```
   pub fn validate_path_containment(&self, target_path: &Path) -> Result<PathBuf, String> {
     // Handle absolute paths - convert to relative if they're within base
     let working_path = if target_path.is_absolute() {
@@ -122,10 +129,8 @@ impl PathSecurityValidator {
     } else {
       target_path.to_path_buf()
     };
-
     // Build the full path relative to base
     let full_path = self.base_path.join(&working_path);
-
     // Canonicalize the target path
     let canonical_target = if full_path.exists() {
       // Path exists - canonicalize directly
@@ -136,7 +141,6 @@ impl PathSecurityValidator {
       // Path doesn't exist yet - canonicalize parent and append filename
       canonicalize_non_existent_path(&full_path)?
     };
-
     // Verify containment after canonicalization
     if !canonical_target.starts_with(&self.base_path) {
       let event = SecurityEvent::PathTraversalAttempt {
@@ -144,7 +148,6 @@ impl PathSecurityValidator {
         base_path: self.base_path.display().to_string(),
       };
       log_security_event(&event);
-
       return Err(format!(
         "Path traversal detected: '{}' resolves to '{}' which is outside allowed directory '{}'",
         target_path.display(),
@@ -152,14 +155,12 @@ impl PathSecurityValidator {
         self.base_path.display()
       ));
     }
-
     // Log successful validation
     let event = SecurityEvent::PathValidationSuccess {
       target_path: target_path.display().to_string(),
       base_path: self.base_path.display().to_string(),
     };
     log_security_event(&event);
-
     Ok(canonical_target)
   }
 
@@ -181,7 +182,7 @@ impl PathSecurityValidator {
 
 /// Handle canonicalization for non-existent paths by canonicalizing the parent
 /// and appending the filename/directory name
-fn canonicalize_non_existent_path(path: &Path) -> Result<PathBuf, String> {
+pub fn canonicalize_non_existent_path(path: &Path) -> Result<PathBuf, String> {
   if let Some(parent) = path.parent() {
     let canonical_parent = if parent.exists() {
       fs::canonicalize(parent).map_err(|e| {
@@ -191,7 +192,6 @@ fn canonicalize_non_existent_path(path: &Path) -> Result<PathBuf, String> {
       // Recursively handle non-existent parents
       canonicalize_non_existent_path(parent)?
     };
-
     if let Some(filename) = path.file_name() {
       Ok(canonical_parent.join(filename))
     } else {

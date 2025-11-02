@@ -9,7 +9,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
+/// use syntaxpresso_core::responses::response::Response;
+/// use serde::{Serialize, Deserialize};
+/// 
+/// #[derive(Serialize, Deserialize)]
+/// struct MyData {
+///     field: String,
+/// }
+/// 
+/// # fn main() -> Result<(), serde_json::Error> {
 /// // Successful response with data
 /// let response = Response::success("my-command".to_string(), "/path/to/cwd".to_string(), MyData { field: "value".to_string() });
 ///
@@ -21,6 +30,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// // Convert to JSON
 /// let json = response.to_json()?;
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
