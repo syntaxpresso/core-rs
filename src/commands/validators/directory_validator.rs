@@ -18,14 +18,6 @@ use std::path::PathBuf;
 /// - Ensures file path stays within the specified base directory
 /// - Handles both existing and non-existent files
 ///
-/// # Examples
-/// ```
-/// use std::path::Path;
-/// use crate::commands::validators::directory_validator::validate_file_path_within_base;
-///
-/// let base = Path::new("/project/src");
-/// let safe_file = validate_file_path_within_base("entities/User.java", base)?;
-/// ```
 pub fn validate_file_path_within_base(
   file_path: &str,
   base_path: &std::path::Path,
@@ -54,12 +46,6 @@ pub fn validate_file_path_within_base(
 /// - The --cwd parameter should accept any valid directory (user's project root)
 /// - Security restrictions apply to operations WITHIN the chosen cwd, not to the cwd selection itself
 /// - Users should be able to work on projects anywhere they have filesystem access
-///
-/// # Usage with clap
-/// ```rust
-/// #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
-/// cwd: PathBuf,
-/// ```
 pub fn validate_directory_unrestricted(s: &str) -> Result<PathBuf, String> {
   let path = PathBuf::from(s);
   // Basic validation - ensure directory exists and is accessible

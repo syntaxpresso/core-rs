@@ -13,8 +13,11 @@ use tree_sitter::Node;
 /// * `None` - If no package declaration exists in the file
 ///
 /// # Example
-/// ```rust
-/// // For Java file containing: package com.example.myapp;
+/// ```
+/// use syntaxpresso_core::common::services::package_declaration_service::get_package_declaration_node;
+/// use syntaxpresso_core::common::ts_file::TSFile;
+///
+/// let ts_file = TSFile::from_source_code("package com.example.myapp;");
 /// let package_node = get_package_declaration_node(&ts_file);
 /// // Returns the entire package_declaration node
 /// ```
@@ -37,11 +40,17 @@ pub fn get_package_declaration_node(ts_file: &TSFile) -> Option<Node<'_>> {
 /// * `None` - If no scoped identifier is found or package has only one component
 ///
 /// # Example
-/// ```rust
-/// // For Java file containing: package com.example.myapp;
-/// let class_name_node = get_package_class_name_node(&ts_file, &package_node);
-/// let class_name_text = ts_file.get_text_from_node(&class_name_node.unwrap());
-/// // Returns node containing: "myapp"
+/// ```
+/// use syntaxpresso_core::common::services::package_declaration_service::{get_package_class_name_node, get_package_declaration_node};
+/// use syntaxpresso_core::common::ts_file::TSFile;
+///
+/// let ts_file = TSFile::from_source_code("package com.example.myapp;");
+/// let package_node = get_package_declaration_node(&ts_file).unwrap();
+/// let class_name_node = get_package_class_name_node(&ts_file, package_node);
+/// if let Some(node) = class_name_node {
+///     let class_name_text = ts_file.get_text_from_node(&node);
+///     // Returns node containing: "myapp"
+/// }
 /// ```
 ///
 /// # Expected Result
@@ -78,11 +87,17 @@ pub fn get_package_class_name_node<'a>(
 /// * `None` - If no scoped identifier is found or package has only one component
 ///
 /// # Example
-/// ```rust
-/// // For Java file containing: package com.example.myapp;
-/// let scope_node = get_package_class_scope_node(&ts_file, &package_node);
-/// let scope_text = ts_file.get_text_from_node(&scope_node.unwrap());
-/// // Returns node containing: "com.example"
+/// ```
+/// use syntaxpresso_core::common::services::package_declaration_service::{get_package_class_scope_node, get_package_declaration_node};
+/// use syntaxpresso_core::common::ts_file::TSFile;
+///
+/// let ts_file = TSFile::from_source_code("package com.example.myapp;");
+/// let package_node = get_package_declaration_node(&ts_file).unwrap();
+/// let scope_node = get_package_class_scope_node(&ts_file, package_node);
+/// if let Some(node) = scope_node {
+///     let scope_text = ts_file.get_text_from_node(&node);
+///     // Returns node containing: "com.example"
+/// }
 /// ```
 ///
 /// # Expected Result
@@ -119,11 +134,17 @@ pub fn get_package_class_scope_node<'a>(
 /// * `None` - If no scoped identifier is found
 ///
 /// # Example
-/// ```rust
-/// // For Java file containing: package com.example.myapp;
-/// let scope_node = get_package_scope_node(&ts_file, &package_node);
-/// let scope_text = ts_file.get_text_from_node(&scope_node.unwrap());
-/// // Returns node containing: "com.example.myapp"
+/// ```
+/// use syntaxpresso_core::common::services::package_declaration_service::{get_package_scope_node, get_package_declaration_node};
+/// use syntaxpresso_core::common::ts_file::TSFile;
+///
+/// let ts_file = TSFile::from_source_code("package com.example.myapp;");
+/// let package_node = get_package_declaration_node(&ts_file).unwrap();
+/// let scope_node = get_package_scope_node(&ts_file, package_node);
+/// if let Some(node) = scope_node {
+///     let scope_text = ts_file.get_text_from_node(&node);
+///     // Returns node containing: "com.example.myapp"
+/// }
 /// ```
 ///
 /// # Expected Result

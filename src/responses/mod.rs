@@ -4,4 +4,6 @@ pub mod error_response;
 pub mod file_response;
 pub mod get_files_response;
 pub mod get_jpa_entity_info_response;
+pub mod get_packages_response;
+pub mod package_response;
 pub mod response;

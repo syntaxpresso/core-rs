@@ -91,36 +91,16 @@ impl TSFile {
   }
 
   /// Replace content at specific positions using incremental parsing
+  /// This method preserves the exact position-based API for backward compatibility
   fn replace_text_incremental_by_pos(
     &mut self,
     start_byte: usize,
     old_end_byte: usize,
-    start_position: Point,
-    old_end_position: Point,
+    _start_position: Point, // Kept for API compatibility, but we calculate internally
+    _old_end_position: Point, // Kept for API compatibility, but we calculate internally
     new_text: &str,
   ) -> bool {
-    let new_end_byte = start_byte + new_text.len();
-    // Create edit descriptor for tree-sitter
-    let edit = InputEdit {
-      start_byte,
-      old_end_byte,
-      new_end_byte,
-      start_position,
-      old_end_position,
-      new_end_position: self.calculate_new_position(start_byte, new_text),
-    };
-    // Tell tree about the edit BEFORE changing source
-    if let Some(tree) = &mut self.tree {
-      tree.edit(&edit);
-      // Apply the text change
-      self.source_code.replace_range(start_byte..old_end_byte, new_text);
-      // Incremental re-parse (much faster than full reparse!)
-      self.tree = self.parser.parse(&self.source_code, Some(tree));
-      self.modified = true;
-      true
-    } else {
-      false
-    }
+    self.apply_incremental_edit(start_byte, old_end_byte, new_text)
   }
 
   pub fn from_source_code(source_code: &str) -> Self {
@@ -157,17 +137,15 @@ impl TSFile {
   }
 
   /// Update all source code
+  /// For complete replacement, full reparse is appropriate as incremental parsing wouldn't provide benefits
   pub fn update_source_code(&mut self, new_source_code: &str) {
     self.set_data(new_source_code);
     self.modified = true;
   }
 
-  /// Update a range in the source code
+  /// Update a range in the source code using incremental parsing for better performance
   pub fn replace_text_by_range(&mut self, start: usize, end: usize, new_text: &str) {
-    let mut content = self.source_code.clone();
-    content.replace_range(start..end, new_text);
-    self.set_data(&content);
-    self.modified = true;
+    self.apply_incremental_edit(start, end, new_text);
   }
 
   /// Replace node content using incremental parsing (FAST!)
@@ -195,12 +173,10 @@ impl TSFile {
     }
   }
 
-  /// Insert text at a position
+  /// Insert text at a position using incremental parsing for better performance
   pub fn insert_text(&mut self, position: usize, text: &str) {
-    let mut content = self.source_code.clone();
-    content.insert_str(position, text);
-    self.set_data(&content);
-    self.modified = true;
+    // For insertion, end_byte is the same as start_byte (zero-width range)
+    self.apply_incremental_edit(position, position, text);
   }
 
   /// Save to original file path
@@ -240,12 +216,16 @@ impl TSFile {
   /// # Examples
   /// ```
   /// use std::path::Path;
+  /// use syntaxpresso_core::common::ts_file::TSFile;
   ///
+  /// # fn main() -> std::io::Result<()> {
   /// let mut ts_file = TSFile::from_source_code("public class Example {}");
-  /// let base_dir = Path::new("/project/root");
-  /// let target = Path::new("src/main/java/Example.java");
+  /// let base_dir = Path::new("/tmp");
+  /// let target = Path::new("Example.java");
   ///
   /// ts_file.save_as(target, base_dir)?;
+  /// # Ok(())
+  /// # }
   /// ```
   pub fn save_as(&mut self, path: &Path, base_path: &Path) -> std::io::Result<()> {
     // Create security validator
@@ -334,7 +314,7 @@ impl TSFile {
     Ok(nodes)
   }
 
-  /// Convert byte position to line/column (1-based)
+  /// Convert byte position to line/column (0-based for tree-sitter)
   fn byte_position_to_point(&self, byte_position: usize) -> Point {
     let mut row = 0;
     let mut col = 0;
@@ -350,6 +330,45 @@ impl TSFile {
       }
     }
     Point::new(row, col)
+  }
+
+  /// Perform incremental update for any text modification
+  /// This is the core method that all text modifications should use for consistency and performance
+  fn apply_incremental_edit(&mut self, start_byte: usize, end_byte: usize, new_text: &str) -> bool {
+    // Calculate positions before borrowing tree mutably
+    let start_position = self.byte_position_to_point(start_byte);
+    let old_end_position = self.byte_position_to_point(end_byte);
+    let new_end_position = self.calculate_new_position(start_byte, new_text);
+    let new_end_byte = start_byte + new_text.len();
+
+    if let Some(tree) = &mut self.tree {
+      // Create edit descriptor for tree-sitter
+      let edit = InputEdit {
+        start_byte,
+        old_end_byte: end_byte,
+        new_end_byte,
+        start_position,
+        old_end_position,
+        new_end_position,
+      };
+
+      // Tell tree about the edit BEFORE changing source
+      tree.edit(&edit);
+
+      // Apply the text change
+      self.source_code.replace_range(start_byte..end_byte, new_text);
+
+      // Incremental re-parse (much faster than full reparse!)
+      self.tree = self.parser.parse(&self.source_code, Some(tree));
+      self.modified = true;
+      true
+    } else {
+      // Fallback for when there's no tree (shouldn't happen in normal usage)
+      self.source_code.replace_range(start_byte..end_byte, new_text);
+      self.tree = self.parser.parse(&self.source_code, None);
+      self.modified = true;
+      false
+    }
   }
 
   /// Find a node by byte position

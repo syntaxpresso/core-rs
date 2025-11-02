@@ -25,48 +25,48 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.base.ref }}
-      
+
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
-      
+
       - name: Configure Git
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-      
+
       - name: Get current version and calculate next
         id: create_version
         run: |
           # Get the latest tag directly from Git
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag from Git: '$LATEST_TAG'"
-          
+
           # Remove 'v' prefix and validate
           CURRENT_VERSION=${LATEST_TAG#v}
           echo "Cleaned current version: '$CURRENT_VERSION'"
-          
+
           if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: Could not parse version from tag. Got: '$CURRENT_VERSION'"
             echo "Setting fallback version to 0.0.1"
             CURRENT_VERSION="0.0.1"
           fi
-          
+
           echo "Current version: $CURRENT_VERSION"
-          
+
           # Parse version components
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
+
           if [[ -z "$MAJOR" || -z "$MINOR" || -z "$PATCH" ]]; then
             echo "Error: Failed to parse version components from '$CURRENT_VERSION'"
             exit 1
           fi
-          
+
           echo "Parsed components - MAJOR: $MAJOR, MINOR: $MINOR, PATCH: $PATCH"
-          
+
           # Determine version increment based on labels
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'feature') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
             echo "Incrementing minor version for feature/enhancement"
@@ -80,16 +80,16 @@ jobs:
              echo "Note: This workflow only runs for merged PRs from develop to main branch."
              exit 0
           fi
-          
+
           # Create new version
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "New version: $NEW_VERSION"
-          
+
           # Update Cargo.toml version
           sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
           git add Cargo.toml
           git commit -m "chore: bump version to $NEW_VERSION" || echo "No changes to commit"
-          
+
           # Set output and create tag
           echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Creating tag: v${NEW_VERSION}"
@@ -108,25 +108,25 @@ jobs:
             target: x86_64-unknown-linux-gnu
             platform: linux
             arch: amd64
-            binary_name: core
+            binary_name: syntaxpresso-core
             output_name: syntaxpresso-core-linux-amd64
           - os: macos-13
             target: x86_64-apple-darwin
             platform: macos
             arch: amd64
-            binary_name: core
+            binary_name: syntaxpresso-core
             output_name: syntaxpresso-core-macos-amd64
           - os: macos-latest
             target: aarch64-apple-darwin
             platform: macos
             arch: arm64
-            binary_name: core
+            binary_name: syntaxpresso-core
             output_name: syntaxpresso-core-macos-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             platform: windows
             arch: amd64
-            binary_name: core.exe
+            binary_name: syntaxpresso-core.exe
             output_name: syntaxpresso-core-windows-amd64.exe
     runs-on: ${{ matrix.os }}
     steps:
@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -142,19 +142,19 @@ jobs:
           target: ${{ matrix.target }}
           profile: minimal
           override: true
-      
+
       - name: Install cross-compilation dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-multilib
-      
+
       - name: Build release binary
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --target ${{ matrix.target }}
-      
+
       - name: Rename binary for platform
         run: |
           if [ -f "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" ]; then
@@ -166,13 +166,13 @@ jobs:
             exit 1
           fi
         shell: bash
-      
+
       - name: Make binary executable (Unix)
         if: matrix.platform != 'windows'
         run: |
           chmod +x "${{ matrix.output_name }}"
           echo "Made ${{ matrix.output_name }} executable"
-      
+
       - name: Verify renamed binary
         run: |
           if [ -f "${{ matrix.output_name }}" ]; then
@@ -183,7 +183,7 @@ jobs:
             exit 1
           fi
         shell: bash
-      
+
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -204,12 +204,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: binaries
-      
+
       - name: List downloaded files
         run: |
           echo "Contents of binaries directory:"
@@ -220,7 +220,7 @@ jobs:
             echo "Contents of $dir:"
             ls -la "$dir"
           done
-      
+
       - name: Prepare release files
         run: |
           mkdir -p release-files
@@ -234,7 +234,7 @@ jobs:
           chmod +x release-files/syntaxpresso-core-macos-arm64 || true
           echo "Final release files with permissions:"
           ls -la release-files/
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

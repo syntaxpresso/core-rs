@@ -71,15 +71,19 @@ pub fn parse_all_files(cwd: &Path, source_directory_type: &JavaSourceDirectoryTy
 /// # Examples
 /// ```
 /// use std::path::Path;
-/// use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
+/// use syntaxpresso_core::common::types::java_source_directory_type::JavaSourceDirectoryType;
+/// use syntaxpresso_core::common::utils::path_util::get_file_path_from_package_scope;
 ///
-/// let project_root = Path::new("/path/to/project");
+/// # fn main() -> Result<(), String> {
+/// let project_root = Path::new("/tmp");
 /// let package_dir = get_file_path_from_package_scope(
 ///     project_root,
 ///     "com.example.foo",
 ///     &JavaSourceDirectoryType::Main
 /// )?;
 /// // Use package_dir as the directory for new source files
+/// # Ok(())
+/// # }
 /// ```
 pub fn get_file_path_from_package_scope(
   root_dir: &Path,

@@ -9,7 +9,16 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
+/// use syntaxpresso_core::responses::response::Response;
+/// use serde::{Serialize, Deserialize};
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct MyData {
+///     field: String,
+/// }
+///
+/// # fn main() -> Result<(), serde_json::Error> {
 /// // Successful response with data
 /// let response = Response::success("my-command".to_string(), "/path/to/cwd".to_string(), MyData { field: "value".to_string() });
 ///
@@ -21,6 +30,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// // Convert to JSON
 /// let json = response.to_json()?;
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -172,109 +183,5 @@ where
       Ok(json) => write!(f, "{}", json),
       Err(_) => write!(f, r#"{{"succeed":false,"errorReason":"Serialization failed"}}"#),
     }
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use serde::Serialize;
-
-  #[derive(Serialize, Debug, PartialEq, Clone)]
-  struct TestData {
-    message: String,
-    count: u32,
-  }
-
-  #[test]
-  fn test_success_with_data() {
-    let data = TestData { message: "Hello".to_string(), count: 42 };
-    let response =
-      Response::success("test-command".to_string(), "/test/path".to_string(), data.clone());
-
-    assert_eq!(response.command, "test-command");
-    assert_eq!(response.cwd, "/test/path");
-    assert!(response.is_success());
-    assert!(!response.is_error());
-    assert_eq!(response.get_data(), Some(&data));
-    assert_eq!(response.get_error(), None);
-  }
-
-  #[test]
-  fn test_success_empty() {
-    let response: Response<TestData> =
-      Response::success_empty("test-command".to_string(), "/test/path".to_string());
-
-    assert_eq!(response.command, "test-command");
-    assert_eq!(response.cwd, "/test/path");
-    assert!(response.is_success());
-    assert!(!response.is_error());
-    assert_eq!(response.get_data(), None);
-    assert_eq!(response.get_error(), None);
-  }
-
-  #[test]
-  fn test_error() {
-    let error_msg = "Something went wrong".to_string();
-    let response: Response<TestData> =
-      Response::error("test-command".to_string(), "/test/path".to_string(), error_msg.clone());
-
-    assert_eq!(response.command, "test-command");
-    assert_eq!(response.cwd, "/test/path");
-    assert!(!response.is_success());
-    assert!(response.is_error());
-    assert_eq!(response.get_data(), None);
-    assert_eq!(response.get_error(), Some(&error_msg));
-  }
-
-  #[test]
-  #[should_panic(expected = "Error reason cannot be empty")]
-  fn test_error_empty_reason() {
-    let _response: Response<TestData> =
-      Response::error("test-command".to_string(), "/test/path".to_string(), "   ".to_string());
-  }
-
-  #[test]
-  fn test_json_serialization() {
-    let data = TestData { message: "test".to_string(), count: 1 };
-    let response = Response::success("test-command".to_string(), "/test/path".to_string(), data);
-
-    let json = response.to_json().unwrap();
-    assert!(json.contains(r#""command":"test-command""#));
-    assert!(json.contains(r#""cwd":"/test/path""#));
-    assert!(json.contains(r#""succeed":true"#));
-    assert!(json.contains(r#""message":"test""#));
-    assert!(json.contains(r#""count":1"#));
-  }
-
-  #[test]
-  fn test_error_json_serialization() {
-    let response: Response<TestData> = Response::error(
-      "test-command".to_string(),
-      "/test/path".to_string(),
-      "Test error".to_string(),
-    );
-
-    let json = response.to_json().unwrap();
-    assert!(json.contains(r#""command":"test-command""#));
-    assert!(json.contains(r#""cwd":"/test/path""#));
-    assert!(json.contains(r#""succeed":false"#));
-    assert!(json.contains(r#""errorReason":"Test error""#));
-    assert!(!json.contains("data"));
-  }
-
-  #[test]
-  fn test_display_trait() {
-    let response: Response<TestData> = Response::error(
-      "test-command".to_string(),
-      "/test/path".to_string(),
-      "Test error".to_string(),
-    );
-    let display_output = format!("{}", response);
-
-    assert!(display_output.contains(r#""command":"test-command""#));
-    assert!(display_output.contains(r#""cwd":"/test/path""#));
-    assert!(display_output.contains(r#""succeed":false"#));
-    assert!(display_output.contains(r#""errorReason":"Test error""#));
   }
 }

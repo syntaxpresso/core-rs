@@ -8,8 +8,10 @@ use commands::Commands;
 use crate::responses::error_response::ErrorResponse;
 
 #[derive(Parser)]
-#[command(name = "core-rs")]
-#[command(about = "A CLI application that handles commands and returns JSON responses")]
+#[command(name = "syntaxpresso-core")]
+#[command(
+  about = "A standalone Rust-based CLI backend for IDE plugins that provides advanced Java code generation and manipulation capabilities using Tree-Sitter."
+)]
 struct Cli {
   #[command(subcommand)]
   command: Commands,
