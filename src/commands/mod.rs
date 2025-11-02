@@ -8,6 +8,7 @@ pub mod create_jpa_one_to_one_relationship_command;
 pub mod create_jpa_repository_command;
 pub mod get_all_jpa_entities_command;
 pub mod get_all_jpa_mapped_superclasses;
+pub mod get_all_packages_command;
 pub mod get_jpa_entity_info_command;
 pub mod services;
 mod validators;
@@ -45,6 +46,23 @@ pub enum Commands {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
   },
+  GetJPAEntityInfo {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = false)]
+    entity_file_path: Option<PathBuf>,
+
+    #[arg(long, required = false)]
+    b64_source_code: Option<String>,
+  },
+  GetAllPackages {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, default_value = "main")]
+    source_directory: JavaSourceDirectoryType,
+  },
   CreateJavaFile {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
@@ -80,16 +98,6 @@ pub enum Commands {
 
     #[arg(long, required = false)]
     b64_superclass_source: Option<String>,
-  },
-  GetJPAEntityInfo {
-    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
-    cwd: PathBuf,
-
-    #[arg(long, required = false)]
-    entity_file_path: Option<PathBuf>,
-
-    #[arg(long, required = false)]
-    b64_source_code: Option<String>,
   },
   CreateJPAEntityBasicField {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
@@ -277,6 +285,18 @@ impl Commands {
         let response = get_all_jpa_mapped_superclasses::execute(cwd.as_path());
         response.to_json_pretty().map_err(|e| e.into())
       }
+      Commands::GetJPAEntityInfo { cwd, entity_file_path, b64_source_code } => {
+        let response = get_jpa_entity_info_command::execute(
+          cwd.as_path(),
+          entity_file_path.as_deref(),
+          b64_source_code.as_deref(),
+        );
+        response.to_json_pretty().map_err(|e| e.into())
+      }
+      Commands::GetAllPackages { cwd, source_directory } => {
+        let response = get_all_packages_command::execute(cwd.as_path(), source_directory);
+        response.to_json_pretty().map_err(|e| e.into())
+      }
       Commands::CreateJavaFile { cwd, package_name, file_name, file_type, source_directory } => {
         let response = create_java_file_command::execute(
           cwd.as_path(),
@@ -296,14 +316,6 @@ impl Commands {
           cwd.as_path(),
           entity_file_path.as_path(),
           b64_superclass_source.as_deref(),
-        );
-        response.to_json_pretty().map_err(|e| e.into())
-      }
-      Commands::GetJPAEntityInfo { cwd, entity_file_path, b64_source_code } => {
-        let response = get_jpa_entity_info_command::execute(
-          cwd.as_path(),
-          entity_file_path.as_deref(),
-          b64_source_code.as_deref(),
         );
         response.to_json_pretty().map_err(|e| e.into())
       }
