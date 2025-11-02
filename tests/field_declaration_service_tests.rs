@@ -304,47 +304,48 @@ public class UserService {
   #[test]
   fn test_edge_cases_wrong_node_types() {
     let ts_file = create_ts_file(COMPLEX_JAVA_CLASS);
-    if let Some(class_node) = find_class_node_by_name(&ts_file, "Product") 
-      && let Some(id_field) = find_field_declaration_node_by_name(&ts_file, "id", class_node) {
-        // Test functions that expect field_declaration with class_declaration node
-        let type_node = get_field_declaration_type_node(&ts_file, class_node);
-        assert!(
-          type_node.is_none(),
-          "Should return None when passing class_declaration to field function"
-        );
+    if let Some(class_node) = find_class_node_by_name(&ts_file, "Product")
+      && let Some(id_field) = find_field_declaration_node_by_name(&ts_file, "id", class_node)
+    {
+      // Test functions that expect field_declaration with class_declaration node
+      let type_node = get_field_declaration_type_node(&ts_file, class_node);
+      assert!(
+        type_node.is_none(),
+        "Should return None when passing class_declaration to field function"
+      );
 
-        let name_node = get_field_declaration_name_node(&ts_file, class_node);
-        assert!(
-          name_node.is_none(),
-          "Should return None when passing class_declaration to field function"
-        );
+      let name_node = get_field_declaration_name_node(&ts_file, class_node);
+      assert!(
+        name_node.is_none(),
+        "Should return None when passing class_declaration to field function"
+      );
 
-        let value_node = get_field_declaration_value_node(&ts_file, class_node);
-        assert!(
-          value_node.is_none(),
-          "Should return None when passing class_declaration to field function"
-        );
+      let value_node = get_field_declaration_value_node(&ts_file, class_node);
+      assert!(
+        value_node.is_none(),
+        "Should return None when passing class_declaration to field function"
+      );
 
-        // Test functions that expect class_declaration with field_declaration node
-        let all_fields = get_all_field_declaration_nodes(&ts_file, id_field);
-        assert_eq!(
-          all_fields.len(),
-          0,
-          "Should return empty vector when passing field_declaration to class function"
-        );
+      // Test functions that expect class_declaration with field_declaration node
+      let all_fields = get_all_field_declaration_nodes(&ts_file, id_field);
+      assert_eq!(
+        all_fields.len(),
+        0,
+        "Should return empty vector when passing field_declaration to class function"
+      );
 
-        let all_methods = get_all_method_declaration_nodes(&ts_file, id_field);
-        assert_eq!(
-          all_methods.len(),
-          0,
-          "Should return empty vector when passing field_declaration to class function"
-        );
+      let all_methods = get_all_method_declaration_nodes(&ts_file, id_field);
+      assert_eq!(
+        all_methods.len(),
+        0,
+        "Should return empty vector when passing field_declaration to class function"
+      );
 
-        let class_body = get_class_body_node(&ts_file, id_field);
-        assert!(
-          class_body.is_none(),
-          "Should return None when passing field_declaration to class function"
-        );
-      }
+      let class_body = get_class_body_node(&ts_file, id_field);
+      assert!(
+        class_body.is_none(),
+        "Should return None when passing field_declaration to class function"
+      );
+    }
   }
 }

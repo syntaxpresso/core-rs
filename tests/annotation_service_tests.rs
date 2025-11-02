@@ -48,13 +48,14 @@ mod annotation_service_tests {
 
       for annotation in annotations {
         if let Some(name_node) = get_annotation_name_node(&ts_file, annotation)
-          && let Some(name_text) = ts_file.get_text_from_node(&name_node) {
-            assert!(!name_text.is_empty(), "Annotation name should not be empty");
-            assert!(
-              name_text.chars().all(|c| c.is_alphanumeric() || c == '_'),
-              "Name should be valid identifier"
-            );
-          }
+          && let Some(name_text) = ts_file.get_text_from_node(&name_node)
+        {
+          assert!(!name_text.is_empty(), "Annotation name should not be empty");
+          assert!(
+            name_text.chars().all(|c| c.is_alphanumeric() || c == '_'),
+            "Name should be valid identifier"
+          );
+        }
       }
     }
   }
@@ -224,9 +225,10 @@ public class User {
       assert!(name_value.is_some(), "Should find value for 'name' key");
 
       if let Some(value_node) = name_value
-        && let Some(value_text) = ts_file.get_text_from_node(&value_node) {
-          assert!(value_text.contains("\""), "Name value should be a quoted string");
-        }
+        && let Some(value_text) = ts_file.get_text_from_node(&value_node)
+      {
+        assert!(value_text.contains("\""), "Name value should be a quoted string");
+      }
 
       // Look for "strategy" key value
       let strategy_value = find_annotation_value_node_by_key(&ts_file, root, "strategy");
