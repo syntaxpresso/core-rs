@@ -394,7 +394,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "syntaxpresso_core"
+name = "syntaxpresso-core"
 version = "0.1.0"
 dependencies = [
  "base64",
