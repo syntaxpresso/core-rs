@@ -238,19 +238,19 @@ impl TSFile {
   /// - Canonicalizes paths for accurate security checking
   ///
   /// # Examples
-   /// ```
-   /// use std::path::Path;
-   /// use syntaxpresso_core::common::ts_file::TSFile;
-   ///
-   /// # fn main() -> std::io::Result<()> {
-   /// let mut ts_file = TSFile::from_source_code("public class Example {}");
-   /// let base_dir = Path::new("/tmp");
-   /// let target = Path::new("Example.java");
-   ///
-   /// ts_file.save_as(target, base_dir)?;
-   /// # Ok(())
-   /// # }
-   /// ```
+  /// ```
+  /// use std::path::Path;
+  /// use syntaxpresso_core::common::ts_file::TSFile;
+  ///
+  /// # fn main() -> std::io::Result<()> {
+  /// let mut ts_file = TSFile::from_source_code("public class Example {}");
+  /// let base_dir = Path::new("/tmp");
+  /// let target = Path::new("Example.java");
+  ///
+  /// ts_file.save_as(target, base_dir)?;
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn save_as(&mut self, path: &Path, base_path: &Path) -> std::io::Result<()> {
     // Create security validator
     let validator = PathSecurityValidator::new(base_path)

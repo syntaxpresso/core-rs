@@ -65,15 +65,15 @@ impl PathSecurityValidator {
   /// * `Err(String)` - If the base path cannot be canonicalized or accessed
   ///
   /// # Examples
-   /// ```
-   /// use std::path::Path;
-   /// use syntaxpresso_core::common::utils::path_security_util::PathSecurityValidator;
-   /// 
-   /// # fn main() -> Result<(), String> {
-   /// let validator = PathSecurityValidator::new(Path::new("/tmp"))?;
-   /// # Ok(())
-   /// # }
-   /// ```
+  /// ```
+  /// use std::path::Path;
+  /// use syntaxpresso_core::common::utils::path_security_util::PathSecurityValidator;
+  ///
+  /// # fn main() -> Result<(), String> {
+  /// let validator = PathSecurityValidator::new(Path::new("/tmp"))?;
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn new(base_path: &Path) -> Result<Self, String> {
     let canonical_base = fs::canonicalize(base_path)
       .map_err(|e| format!("Cannot canonicalize base path '{}': {}", base_path.display(), e))?;
@@ -101,16 +101,16 @@ impl PathSecurityValidator {
   /// - Blocks absolute paths that escape the base directory
   ///
   /// # Examples
-   /// ```
-   /// use std::path::Path;
-   /// use syntaxpresso_core::common::utils::path_security_util::PathSecurityValidator;
-   /// 
-   /// # fn main() -> Result<(), String> {
-   /// let validator = PathSecurityValidator::new(Path::new("/tmp"))?;
-   /// let safe_path = validator.validate_path_containment(Path::new("src/main.rs"))?;
-   /// # Ok(())
-   /// # }
-   /// ```
+  /// ```
+  /// use std::path::Path;
+  /// use syntaxpresso_core::common::utils::path_security_util::PathSecurityValidator;
+  ///
+  /// # fn main() -> Result<(), String> {
+  /// let validator = PathSecurityValidator::new(Path::new("/tmp"))?;
+  /// let safe_path = validator.validate_path_containment(Path::new("src/main.rs"))?;
+  /// # Ok(())
+  /// # }
+  /// ```
   pub fn validate_path_containment(&self, target_path: &Path) -> Result<PathBuf, String> {
     // Handle absolute paths - convert to relative if they're within base
     let working_path = if target_path.is_absolute() {
