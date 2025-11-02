@@ -90,11 +90,9 @@ jobs:
           git add Cargo.toml
           git commit -m "chore: bump version to $NEW_VERSION" || echo "No changes to commit"
 
-          # Set output and create tag
+          # Set output (tag creation moved to final step)
           echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Creating tag: v${NEW_VERSION}"
-          git tag "v${NEW_VERSION}"
-          git push origin "v${NEW_VERSION}"
+          echo "Calculated version: $NEW_VERSION"
 
   # This job builds the native binaries for multiple platforms
   build-native:
@@ -199,6 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -235,9 +234,45 @@ jobs:
           echo "Final release files with permissions:"
           ls -la release-files/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.release.outputs.version }}
-          generate_release_notes: true
-          files: release-files/*
+      - name: Create tag and GitHub Release with tag/release checking
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          TAG_NAME="v${VERSION}"
+          
+          # Fetch all tags to ensure we have the latest
+          git fetch --tags
+          
+          # Check if tag already exists
+          if git tag -l | grep -q "^${TAG_NAME}$"; then
+            echo "Tag ${TAG_NAME} already exists"
+            
+            # Check if GitHub release exists for this tag
+            if gh release view ${TAG_NAME} >/dev/null 2>&1; then
+              echo "GitHub release for ${TAG_NAME} already exists. Skipping release creation."
+              exit 0
+            else
+              echo "Tag exists but no GitHub release found. Creating release for existing tag..."
+              gh release create ${TAG_NAME} \
+                --title "Release ${TAG_NAME}" \
+                --generate-notes \
+                release-files/*
+            fi
+          else
+            echo "Tag ${TAG_NAME} doesn't exist. Creating tag and release..."
+            
+            # Configure Git
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            
+            # Create and push tag
+            git tag ${TAG_NAME}
+            git push origin ${TAG_NAME}
+            
+            # Create GitHub release
+            gh release create ${TAG_NAME} \
+              --title "Release ${TAG_NAME}" \
+              --generate-notes \
+              release-files/*
+          fi
