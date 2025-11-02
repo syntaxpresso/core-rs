@@ -8,4 +8,5 @@ pub mod create_jpa_one_to_one_relationship_service;
 pub mod create_jpa_repository_service;
 pub mod get_all_jpa_entities_service;
 pub mod get_all_jpa_mapped_superclasses;
+pub mod get_all_packages_service;
 pub mod get_jpa_entity_info_service;
