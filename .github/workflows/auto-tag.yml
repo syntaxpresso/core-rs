@@ -1,41 +1,47 @@
-name: Auto Tag on Main Merge
+name: Create Tag on Main Merge
 
 on:
   push:
     branches:
-      - main
-
-permissions:
-  contents: write
+      - main # Triggers when develop is merged into main
 
 jobs:
-  tag:
+  tag-release:
+    name: Create and Push Tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to push the new tag
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Get version from Cargo.toml
-        id: version
+        id: get_version
+        # Reads the version from your specific Cargo.toml path
         run: |
-          VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
-          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Version: v${VERSION}"
+          VERSION=$(grep '^version = ' core-main/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if tag exists
         id: check_tag
         run: |
-          if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          TAG_NAME="v${{ steps.get_version.outputs.version }}"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists. Skipping."
+            echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG_NAME does not exist. Proceeding to create it."
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create and push tag
+      - name: Create and Push Tag
+        # Only runs if the tag from Cargo.toml doesn't exist yet
         if: steps.check_tag.outputs.exists == 'false'
         run: |
+          TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
-          git push origin "${{ steps.version.outputs.version }}"
+          git tag "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
