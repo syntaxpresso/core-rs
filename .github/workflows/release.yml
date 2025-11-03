@@ -1,7 +1,6 @@
 # This workflow is triggered *only* when you push a new tag (e.g., v0.1.6).
 # It uses cargo-dist to build all binaries, package them,
 # and create a professional GitHub release.
-# This single file replaces all the complexity of the previous release.yml.
 
 name: Release with cargo-dist
 
@@ -30,8 +29,8 @@ jobs:
           override: true
 
       - name: Set up cargo-dist
-        # This downloads and installs cargo-dist
-        uses: axodotdev/cargo-dist/base-setup@v0.11.1
+        # Using the specific commit SHA to bypass a runner bug
+        uses: axodotdev/cargo-dist/base-setup@cc9747915e199fe974837a04adf6bd0648ee718d # v0.30.2
 
       - name: Run cargo-dist
         # This is the magic step. It:
