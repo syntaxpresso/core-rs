@@ -200,7 +200,7 @@ jobs:
 
   # Job 4: Create PR to bump version in 'main'
   bump-version-in-main:
-    needs: [create-github-release, release] # MODIFIED: Explicitly need 'release' job
+    needs: [create-github-release, release] # Explicitly need 'release' job for output
     runs-on: ubuntu-latest
     permissions:
       contents: write # To push a new branch
@@ -258,4 +258,7 @@ jobs:
             --title "chore: Bump version to ${{ needs.release.outputs.version }}" \
             --body "Automated version bump following release of v${{ needs.release.outputs.version }}."
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use a Personal Access Token (PAT) stored as a repository secret.
+          # The default GITHUB_TOKEN is restricted from creating PRs
+          # in workflows triggered by 'pull_request' to prevent CI loops.
+          GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
