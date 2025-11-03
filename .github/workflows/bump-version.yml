@@ -1,0 +1,89 @@
+name: Bump Version
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # Only run if PR was merged (not just closed)
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          ssh-key: ${{ secrets.VERSION_BUMP_DEPLOY_KEY }}
+          fetch-depth: 0
+
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          echo "PR Labels: $LABELS"
+
+          # Check for breaking label (major bump)
+          if echo "$LABELS" | grep -q "breaking"; then
+            echo "bump_type=major" >> $GITHUB_OUTPUT
+            echo "Bump type: major (breaking label found)"
+          # Check for enhancement label (minor bump)
+          elif echo "$LABELS" | grep -q "enhancement"; then
+            echo "bump_type=minor" >> $GITHUB_OUTPUT
+            echo "Bump type: minor (enhancement label found)"
+          else
+            # Default to patch for 'fix' label or no labels
+            echo "bump_type=patch" >> $GITHUB_OUTPUT
+            echo "Bump type: patch (fix label or no specific label)"
+          fi
+
+      - name: Bump version
+        id: bump
+        run: |
+          CURRENT=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
+          echo "Current version: $CURRENT"
+
+          BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
+          echo "Applying bump type: $BUMP_TYPE"
+
+          case "$BUMP_TYPE" in
+            patch)
+              # Increment patch: 0.1.1 -> 0.1.2
+              NEW=$(echo $CURRENT | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+              ;;
+            minor)
+              # Increment minor, reset patch: 0.1.1 -> 0.2.0
+              NEW=$(echo $CURRENT | awk -F. '{$(NF-1) = $(NF-1) + 1; $NF = 0;} 1' | sed 's/ /./g')
+              ;;
+            major)
+              # Increment major, reset minor and patch: 0.1.1 -> 1.0.0
+              NEW=$(echo $CURRENT | awk -F. '{$1 = $1 + 1; $2 = 0; $3 = 0;} 1' | sed 's/ /./g')
+              ;;
+          esac
+
+          echo "New version: $NEW"
+          sed -i "s/version = \"$CURRENT\"/version = \"$NEW\"/" Cargo.toml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          git commit -m "chore: bump version to $NEW [skip ci]"
+          git push origin develop
+
+          echo "new_version=$NEW" >> $GITHUB_OUTPUT
+          echo "old_version=$CURRENT" >> $GITHUB_OUTPUT
+      - name: Create summary
+        run: |
+          echo "## Version Bumped Successfully! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Old version:** ${{ steps.bump.outputs.old_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New version:** ${{ steps.bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump type:** ${{ steps.bump_type.outputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version updated on \`develop\` branch." >> $GITHUB_STEP_SUMMARY
