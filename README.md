@@ -155,3 +155,7 @@ cargo test
 ## Support
 
 For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/syntaxpresso/core).
+
+## Changelog
+
+See [Releases](https://github.com/syntaxpresso/core/releases) for version history and changes.
