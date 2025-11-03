@@ -3,7 +3,7 @@
 # 1. Calculates the new version based on PR labels.
 # 2. Builds all release binaries.
 # 3. Creates a new tag and a GitHub Release with the binaries.
-# 4. Bumps the version in 'Cargo.toml' on the 'develop' branch.
+# 4. Creates a new PR to bump the version in 'Cargo.toml' on the 'main' branch.
 
 name: Create Release
 
@@ -198,35 +198,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Job 4: Bump the version in Cargo.toml on the 'develop' branch
-  bump-version-in-develop:
+  # Job 4: Create PR to bump version in 'main'
+  bump-version-in-main:
     needs: create-github-release
     runs-on: ubuntu-latest
     permissions:
-      contents: write # To push to 'develop'
+      contents: write # To push a new branch
+      pull-requests: write # To create a pull request
     steps:
-      - name: Checkout develop branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
-          ref: develop
+          ref: main # Checkout main branch
 
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Update Cargo.toml version
+      - name: Create and push version bump branch
+        id: create_branch
         run: |
           NEW_VERSION="${{ needs.release.outputs.version }}"
+          BRANCH_NAME="chore/bump-version-v${NEW_VERSION}"
+          echo "Creating branch: $BRANCH_NAME"
+
+          # Create branch off main (which is already checked out)
+          git checkout -b $BRANCH_NAME
+
+          # Update Cargo.toml
           sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
 
-      - name: Commit and push version bump
-        run: |
           git add Cargo.toml
-          # Check if there are changes to commit
           if git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo "No changes to commit. Cargo.toml might already be at the new version."
+            echo "BRANCH_CREATED=false" >> $GITHUB_OUTPUT
           else
-            git commit -m "chore: bump version to ${{ needs.release.outputs.version }} after release"
-            git push origin develop
+            git commit -m "chore: bump version to $NEW_VERSION after release"
+            git push origin $BRANCH_NAME
+            echo "BRANCH_CREATED=true" >> $GITHUB_OUTPUT
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
           fi
+
+      - name: Create Pull Request to main
+        if: steps.create_branch.outputs.BRANCH_CREATED == 'true'
+        run: |
+          gh pr create \
+            --base main \
+            --head ${{ steps.create_branch.outputs.BRANCH_NAME }} \
+            --title "chore: Bump version to ${{ needs.release.outputs.version }}" \
+            --body "Automated version bump following release of v${{ needs.release.outputs.version }}."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
