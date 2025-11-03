@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     # Outputs that can be used by other jobs
     outputs:
       version: ${{ steps.create_version.outputs.VERSION }}
@@ -85,8 +86,12 @@ jobs:
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "New version: $NEW_VERSION"
 
-          # Update Cargo.toml version
+           # Update Cargo.toml version
            sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
+           
+           # Create and push release branch
+           BRANCH_NAME="release/v${NEW_VERSION}"
+           git checkout -b "$BRANCH_NAME"
            git add Cargo.toml
            git commit -m "chore: bump version to $NEW_VERSION"
            git push origin main
@@ -167,22 +172,21 @@ jobs:
           fi
         shell: bash
 
-      - name: Make binary executable (Unix)
-        if: matrix.platform != 'windows'
-        run: |
-          chmod +x "${{ matrix.output_name }}"
-          echo "Made ${{ matrix.output_name }} executable"
+           # Create PR for version bump
+           gh pr create \
+             --title "Release: v${NEW_VERSION}" \
+             --body "Automated version bump to v${NEW_VERSION} for release" \
+             --base main \
+             --head "$BRANCH_NAME" \
+             --label "release"
+         env:
+           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify renamed binary
-        run: |
-          if [ -f "${{ matrix.output_name }}" ]; then
-            echo "Successfully created ${{ matrix.output_name }}"
-            ls -la "${{ matrix.output_name }}"
-          else
-            echo "Failed to create ${{ matrix.output_name }}"
-            exit 1
-          fi
-        shell: bash
+       - name: Set outputs
+         run: |
+           # Set output (tag creation will happen in separate workflow after PR merge)
+           echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
