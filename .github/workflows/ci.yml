@@ -1,68 +1,34 @@
-# This workflow runs on Pull Requests to 'develop' or 'main'
-# It runs tests, lints, and uses 'cargo dist plan' to
-# post a comment on the PR showing what a release would look like.
-
 name: CI
 on:
   pull_request:
     branches:
       - develop
       - main
+
 jobs:
-  # Job 1: Run lints, tests
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
           components: rustfmt, clippy
-      - name: Cache cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-      - name: Run cargo fmt check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-      - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
-      - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --workspace
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo test --workspace
 
-  # Job 2: Check the cargo-dist release plan
   plan:
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      # Required to post a comment on the PR
       pull-requests: write
       contents: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run cargo-dist plan
-        # Corrected the path to point to the 'github-action' directory
-        uses: axodotdev/cargo-dist/github-action@cc9747915e199fe974837a04adf6bd0648ee718d # v0.30.2
+      - uses: actions/checkout@v4
+      - uses: axodotdev/cargo-dist/github-action@v0.32.0
         with:
           command: plan
-          pr-comment: true # Posts the plan as a PR comment
+          pr-comment: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
