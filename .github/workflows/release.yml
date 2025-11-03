@@ -4,6 +4,7 @@
 # 2. Builds all release binaries.
 # 3. Creates a new tag and a GitHub Release with the binaries.
 # 4. Creates a new PR to bump the version in 'Cargo.toml' on the 'main' branch.
+# 5. Automatically merges that new PR.
 
 name: Create Release
 
@@ -261,4 +262,12 @@ jobs:
           # Use a Personal Access Token (PAT) stored as a repository secret.
           # The default GITHUB_TOKEN is restricted from creating PRs
           # in workflows triggered by 'pull_request' to prevent CI loops.
+          GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
+
+      - name: Enable Auto-Merge for the PR
+        if: steps.create_branch.outputs.BRANCH_CREATED == 'true'
+        run: |
+          gh pr merge ${{ steps.create_branch.outputs.BRANCH_NAME }} --auto --squash --delete-branch
+        env:
+          # Use the same PAT to merge the PR
           GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
