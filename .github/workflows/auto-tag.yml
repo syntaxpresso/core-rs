@@ -43,6 +43,7 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTO_TAG_TOKEN }}
           TAG_NAME: ${{ steps.check_tag.outputs.tag_name }}
         run: |
+          TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$TAG_NAME" -m "Release $TAG_NAME"
