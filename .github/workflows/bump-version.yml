@@ -77,7 +77,6 @@ jobs:
 
           echo "new_version=$NEW" >> $GITHUB_OUTPUT
           echo "old_version=$CURRENT" >> $GITHUB_OUTPUT
-
       - name: Create summary
         run: |
           echo "## Version Bumped Successfully! 🚀" >> $GITHUB_STEP_SUMMARY
