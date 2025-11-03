@@ -57,17 +57,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-      - name: Set up cargo-dist
-        # Using the specific commit SHA to bypass a runner bug
-        uses: axodotdev/cargo-dist/base-setup@cc9747915e199fe974837a04adf6bd0648ee718d # v0.30.2
+
       - name: Run cargo-dist plan
-        # This posts a comment on the PR with the release plan
-        run: cargo dist plan --output-format=github-pr-comment
+        # This single action installs Rust, cargo-dist, and runs 'plan'
+        # Using the commit SHA for v0.30.2
+        uses: axodotdev/cargo-dist@cc9747915e199fe974837a04adf6bd0648ee718d
+        with:
+          command: plan
+          pr-comment: true # Posts the plan as a PR comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
