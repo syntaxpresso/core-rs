@@ -1,113 +1,213 @@
-# Name for the workflow
 name: Release
-# Controls when the workflow will run
 on:
   pull_request:
-    types: [closed]
     branches:
-      - "main"
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+      - main
+    types:
+      - closed
+permissions:
+  contents: write
 jobs:
-  # This job handles versioning and tagging
-  release:
-    # The 'if' condition ensures this job only runs for merged pull requests from develop to main
-    # and excludes documentation-only PRs
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop' && !contains(github.event.pull_request.labels.*.name, 'documentation') }}
+  update-version-and-create-tag:
+    name: Update project version and create tag
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    # Outputs that can be used by other jobs
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'develop' &&
+      !contains(github.event.pull_request.head_commit.message, 'Update version to')
     outputs:
-      version: ${{ steps.create_version.outputs.VERSION }}
+      version: ${{ steps.bump.outputs.new_version }}
+      tag_name: ${{ steps.bump.outputs.new_tag }}
+      tag_created: ${{ steps.bump.outputs.tag_created }}
+    steps:
+      - name: Checout to main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # Fetch all history to find the last tag correctly
+      - name: Configure git
+        run: |
+          git config --global user.name 'Syntaxpresso[bot]'
+          git config --global user.email 'bot@syntaxpresso.github.io'
+      - name: Update version and create tag
+        id: bump
+        run: |
+          CURRENT_VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version from Cargo.toml: $CURRENT_VERSION"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          echo "Parsed version: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
+          # Determine version increment based on labels
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]]; then
+            echo "Breaking change label found. Incrementing MAJOR version."
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
+            echo "Enhancement label found. Incrementing MINOR version."
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            # This 'else' block handles 'fix' label or no label at all
+            echo "Fix/default label logic. Incrementing PATCH version."
+            PATCH=$((PATCH + 1))
+          fi
+          # Create new version string
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "New version: $NEW_VERSION"
+          # Update Cargo.toml (using the original $CURRENT_VERSION to find and replace)
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
+          # Commit the version bump
+          git add Cargo.toml
+          git commit -m "Bump version to $NEW_VERSION"
+          # Create an ANNOTATED tag so --follow-tags will push it
+          NEW_TAG="v$NEW_VERSION"
+          git tag -a $NEW_TAG -m "Release $NEW_TAG"
+          # Set the output for the next job
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "tag_created=true" >> $GITHUB_OUTPUT
+      - name: Push commit and tag
+        run: git push origin main --follow-tags
+  build-binaries:
+    if: needs.update-version-and-create-tag.outputs.tag_created == 'true'
+    needs: update-version-and-create-tag
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: amd64
+            binary_name: syntaxpresso-core
+            output_name: syntaxpresso-core-linux-amd64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            platform: macos
+            arch: amd64
+            binary_name: syntaxpresso-core
+            output_name: syntaxpresso-core-macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos
+            arch: arm64
+            binary_name: syntaxpresso-core
+            output_name: syntaxpresso-core-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: amd64
+            binary_name: syntaxpresso-core.exe
+            output_name: syntaxpresso-core-windows-amd64.exe
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # This is critical: check out the NEW tag from the previous job
+          ref: ${{ needs.update-version-and-create-tag.outputs.tag_name }}
+          # This prevents the race condition where the tag isn't found
           fetch-depth: 0
-          ref: main
-
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          target: ${{ matrix.target }}
           profile: minimal
           override: true
-
-      - name: Configure Git
+      - name: Install cross-compilation dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-      - name: Get current version and calculate next
-        id: create_version
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - name: Rename binary for platform
         run: |
-          # Get the latest tag directly from Git
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag from Git: '$LATEST_TAG'"
-
-          # Remove 'v' prefix and validate
-          CURRENT_VERSION=${LATEST_TAG#v}
-          echo "Cleaned current version: '$CURRENT_VERSION'"
-
-          if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Could not parse version from tag. Got: '$CURRENT_VERSION'"
-            echo "Setting fallback version to 0.0.1"
-            CURRENT_VERSION="0.0.1"
-          fi
-
-          echo "Current version: $CURRENT_VERSION"
-
-          # Parse version components
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-
-          if [[ -z "$MAJOR" || -z "$MINOR" || -z "$PATCH" ]]; then
-            echo "Error: Failed to parse version components from '$CURRENT_VERSION'"
+          if [ -f "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" ]; then
+            cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "${{ matrix.output_name }}"
+            echo "Copied ${{ matrix.binary_name }} to ${{ matrix.output_name }}"
+          else
+            echo "Binary ${{ matrix.binary_name }} not found!"
+            ls -la target/${{ matrix.target }}/release/
             exit 1
           fi
-
-          echo "Parsed components - MAJOR: $MAJOR, MINOR: $MINOR, PATCH: $PATCH"
-
-          # Determine version increment based on labels
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'feature') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
-            echo "Incrementing minor version for feature/enhancement"
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bug') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'patch') }}" == "true" ]]; then
-            echo "Incrementing patch version for bug/patch"
-            PATCH=$((PATCH + 1))
+        shell: bash
+      - name: Make binary executable (Unix)
+        if: matrix.platform != 'windows'
+        run: |
+          chmod +x "${{ matrix.output_name }}"
+          echo "Made ${{ matrix.output_name }} executable"
+      - name: Verify renamed binary
+        run: |
+          if [ -f "${{ matrix.output_name }}" ]; then
+            echo "Successfully created ${{ matrix.output_name }}"
+            ls -la "${{ matrix.output_name }}"
           else
-            echo "No versioning label found ('feature', 'enhancement', 'bug', 'patch'). Skipping release."
-            echo "Note: This workflow only runs for merged PRs from develop to main branch."
-            exit 0
+            echo "Failed to create ${{ matrix.output_name }}"
+            exit 1
           fi
-
-          # Create new version
-          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          echo "New version: $NEW_VERSION"
-          
-          # Set outputs for later use
-          echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "BRANCH_NAME=release/v${NEW_VERSION}" >> $GITHUB_OUTPUT
-
-          # Update Cargo.toml version
-          sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
-          
-          # Create and push release branch
-          BRANCH_NAME="release/v${NEW_VERSION}"
-          git checkout -b "$BRANCH_NAME"
-          git add Cargo.toml
-          git commit -m "chore: bump version to $NEW_VERSION"
-          git push origin "$BRANCH_NAME"
-
-          # Create PR for version bump
-          gh pr create \
-            --title "Release: v${NEW_VERSION}" \
-            --body "Automated version bump to v${NEW_VERSION} for release" \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --label "release"
+        shell: bash
+      - name: Upload binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}-${{ matrix.arch }}
+          path: ${{ matrix.output_name }}
+          retention-days: 1
+  release:
+    # Only run if the first job created a tag
+    if: needs.update-version-and-create-tag.outputs.tag_created == 'true'
+    needs: [update-version-and-create-tag, build-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Check out the new tag
+          ref: ${{ needs.update-version-and-create-tag.outputs.tag_name }}
+          # Fetch all history so 'gh release create' can generate notes
+          fetch-depth: 0
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+      - name: List downloaded files
+        run: |
+          echo "Contents of binaries directory:"
+          ls -la binaries/
+          echo ""
+          echo "Contents of each subdirectory:"
+          for dir in binaries/*/; do
+            echo "Contents of $dir:"
+            ls -la "$dir"
+          done
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          cp binaries/binary-linux-amd64/syntaxpresso-core-linux-amd64 release-files/ || true
+          cp binaries/binary-macos-amd64/syntaxpresso-core-macos-amd64 release-files/ || true
+          cp binaries/binary-macos-arm64/syntaxpresso-core-macos-arm64 release-files/ || true
+          cp binaries/binary-windows-amd64/syntaxpresso-core-windows-amd64.exe release-files/ || true
+          # Make Unix binaries executable
+          chmod +x release-files/syntaxpresso-core-linux-amd64 || true
+          chmod +x release-files/syntaxpresso-core-macos-amd64 || true
+          chmod +x release-files/syntaxpresso-core-macos-arm64 || true
+          echo "Final release files with permissions:"
+          ls -la release-files/
+      - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Get the tag name from the first job
+          TAG_NAME: ${{ needs.update-version-and-create-tag.outputs.tag_name }}
+        run: |
+          echo "Creating release for ${TAG_NAME}"
+          gh release create ${TAG_NAME} \
+            --title "Release ${TAG_NAME}" \
+            --generate-notes \
+            release-files/*

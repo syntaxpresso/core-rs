@@ -98,6 +98,20 @@ Error responses follow this format:
 
 ### Architecture
 
+Communication follows a **unidirectional request-response model** handled via standard input/output (stdio). The syntaxpresso-core is a stateless CLI application that only prints a single JSON response to stdout before exiting; it never sends commands back to the IDE.
+
+- Request (IDE to Core): The IDE plugin spawns the compiled syntaxpresso-core binary as a new process for each request.
+- All required information (the command, file paths, options) is passed as CLI arguments at spawn time.
+- Execution (Core): The Rust application parses the arguments, executes the requested command, and performs all logic internally.
+- Response (Core to IDE): Upon completion, the Rust core serializes a standard Response object into a single JSON string and prints it to stdout.
+- Result (IDE): The IDE plugin captures this stdout, parses the JSON, and uses the structured data (e.g., file paths, success status, or error details) to update its state. The Rust process then terminates.
+
+<div align="center">
+  <img width="500" alt="syntaxpresso-archtecture" src="https://github.com/user-attachments/assets/ddd3cd2d-3f03-4bbf-b855-8fc17248b3c2" />
+</div>
+
+### Structure
+
 The project is structured for maintainability and extensibility:
 
 ```
@@ -111,20 +125,6 @@ src/
 │   └── utils/          # Utility functions
 └── responses/          # Response type definitions
 ```
-
-### How it communicates with your IDE
-
-Communication follows a **unidirectional request-response model** handled via standard input/output (stdio). The syntaxpresso-core is a stateless CLI application that only prints a single JSON response to stdout before exiting; it never sends commands back to the IDE.
-
-- Request (IDE to Core): The IDE plugin spawns the compiled syntaxpresso-core binary as a new process for each request.
-- All required information (the command, file paths, options) is passed as CLI arguments at spawn time.
-- Execution (Core): The Rust application parses the arguments, executes the requested command, and performs all logic internally.
-- Response (Core to IDE): Upon completion, the Rust core serializes a standard Response object into a single JSON string and prints it to stdout.
-- Result (IDE): The IDE plugin captures this stdout, parses the JSON, and uses the structured data (e.g., file paths, success status, or error details) to update its state. The Rust process then terminates.
-
-<div align="center">
-  <img width="500" alt="syntaxpresso-archtecture" src="https://github.com/user-attachments/assets/ddd3cd2d-3f03-4bbf-b855-8fc17248b3c2" />
-</div>
 
 ### Prerequisites
 
