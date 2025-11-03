@@ -200,7 +200,7 @@ jobs:
 
   # Job 4: Create PR to bump version in 'main'
   bump-version-in-main:
-    needs: create-github-release
+    needs: [create-github-release, release] # MODIFIED: Explicitly need 'release' job
     runs-on: ubuntu-latest
     permissions:
       contents: write # To push a new branch
