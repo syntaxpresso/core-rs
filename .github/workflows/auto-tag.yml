@@ -3,23 +3,25 @@ name: Create Tag on Main Merge
 on:
   push:
     branches:
-      - main # Triggers when develop is merged into main
+      - main
 
 jobs:
   tag-release:
     name: Create and Push Tag
     runs-on: ubuntu-latest
     permissions:
-      contents: write # This is still good practice
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- MODIFIED STEP ---
       - name: Get version from Cargo.toml
         id: get_version
         run: |
-          VERSION=$(grep '^version = ' core-main/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          # Use sed to find the version line, ignore leading whitespace, and extract the value
+          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' core-main/Cargo.toml)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if tag exists
@@ -39,7 +41,6 @@ jobs:
       - name: Create and Push Tag
         if: steps.check_tag.outputs.exists == 'false'
         env:
-          # Use the PAT secret here
           GH_TOKEN: ${{ secrets.AUTO_TAG_TOKEN }}
           TAG_NAME: ${{ steps.check_tag.outputs.tag_name }}
         run: |
@@ -47,6 +48,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$TAG_NAME" -m "Release $TAG_NAME"
-
-          # Authenticate the push using the PAT
           git push https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}.git "$TAG_NAME"
