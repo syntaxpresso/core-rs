@@ -220,6 +220,14 @@ jobs:
         id: create_branch
         run: |
           NEW_VERSION="${{ needs.release.outputs.version }}"
+
+          # Fail fast if the version is empty from a partial re-run
+          if [ -z "$NEW_VERSION" ]; then
+            echo "Error: NEW_VERSION is empty. This can happen if you re-run only this job."
+            echo "Please re-run the entire workflow from the beginning."
+            exit 1
+          fi
+
           BRANCH_NAME="chore/bump-version-v${NEW_VERSION}"
           echo "Creating branch: $BRANCH_NAME"
 
@@ -235,7 +243,8 @@ jobs:
             echo "BRANCH_CREATED=false" >> $GITHUB_OUTPUT
           else
             git commit -m "chore: bump version to $NEW_VERSION after release"
-            git push origin $BRANCH_NAME
+            # Use --force to overwrite the branch if it exists from a previous failed run
+            git push --force origin $BRANCH_NAME
             echo "BRANCH_CREATED=true" >> $GITHUB_OUTPUT
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
           fi
