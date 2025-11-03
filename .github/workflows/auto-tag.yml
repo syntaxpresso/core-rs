@@ -37,6 +37,7 @@ jobs:
             echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           fi
 
+      # --- MODIFIED STEP ---
       - name: Create and Push Tag
         if: steps.check_tag.outputs.exists == 'false'
         env:
