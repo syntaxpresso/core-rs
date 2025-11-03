@@ -64,7 +64,8 @@ jobs:
           profile: minimal
           override: true
       - name: Set up cargo-dist
-        uses: axodotdev/cargo-dist/base-setup@v0.11.1
+        # Updated to the latest stable version
+        uses: axodotdev/cargo-dist/base-setup@v0.30.2
       - name: Run cargo-dist plan
         # This posts a comment on the PR with the release plan
         run: cargo dist plan --output-format=github-pr-comment
