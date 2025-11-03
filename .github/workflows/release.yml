@@ -1,19 +1,13 @@
-# This workflow is triggered *only* when you push a new tag (e.g., v0.1.6).
-# It uses cargo-dist to build all binaries, package them,
-# and create a professional GitHub release.
-
 name: Release with cargo-dist
 
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*" # Runs on any semver tag like v0.1.0
+      - "v[0-9]+.[0-9]+.[0-9]+*"
 
 jobs:
-  # This job does everything: builds, packages, and creates the release
   release:
     runs-on: ubuntu-latest
-    # Grant permissions for cargo-dist to create the release
     permissions:
       contents: write
 
@@ -28,18 +22,7 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Set up cargo-dist
-        # Using the specific commit SHA to bypass a runner bug
-        uses: axodotdev/cargo-dist/base-setup@cc9747915e199fe974837a04adf6bd0648ee718d # v0.30.2
-
       - name: Run cargo-dist
-        # This is the magic step. It:
-        # 1. Builds your app for all configured targets.
-        # 2. Packages them into .zip and .tar.gz archives.
-        # 3. Creates installer scripts (.sh, .ps1).
-        # 4. Generates checksums.
-        # 5. Creates a beautiful GitHub Release and uploads everything.
-        run: cargo dist build --output-format=github
+        uses: axodotdev/cargo-dist/actions/release@v0.30.2
         env:
-          # This token is built-in. No PAT is needed!
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
