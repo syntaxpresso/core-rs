@@ -76,13 +76,6 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      # Step 2: Build release binaries
-      - name: Build binaries
-        uses: ./.github/actions/build-release-binaries # Placeholder, see note below
-        with:
-          # We check out the exact merge commit to build what was *just* merged
-          checkout_ref: ${{ github.event.pull_request.merge_commit_sha }}
-
   # Job 2: Build all release binaries
   # We run this as a separate job to parallelize the builds
   build-release-binaries:
