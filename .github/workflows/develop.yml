@@ -1,24 +1,23 @@
-# Name for the workflow
+# This workflow runs on Pull Requests targeting the 'develop' branch.
+# Its only job is to ensure code quality and that the release binaries
+# can be successfully built before allowing a merge into 'develop'.
+
 name: Develop Branch CI
 
-# Controls when the workflow will run
 on:
   pull_request:
     branches:
       - develop
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This job runs tests and builds the project
+  # Job 1: Run lints, tests, and a basic build
   test-and-build:
-    # Skip this job if the PR is labeled as documentation-only
+    # Don't run on PRs labeled 'documentation'
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -28,14 +27,16 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      - name: Cache cargo registry
+      - name: Cache cargo
         uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
 
       - name: Run cargo fmt check
         uses: actions-rs/cargo@v1
@@ -53,16 +54,16 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --workspace
 
-      - name: Build project
+      - name: Build project (Debug)
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
 
-  # This job builds the native binaries for multiple platforms
-  build-native:
-    # Skip this job if the PR is labeled as documentation-only
+  # Job 2: Build all release binaries as a check
+  build-native-check:
+    # This job ensures the binaries for all targets can be compiled.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     needs: test-and-build
     strategy:
@@ -70,34 +71,24 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            platform: linux
-            arch: amd64
-            binary_name: syntaxpresso-core
             output_name: syntaxpresso-core-linux-amd64
-          - os: macos-13
+            binary_name: syntaxpresso-core
+          - os: macos-13 # Using older macOS for x86_64
             target: x86_64-apple-darwin
-            platform: macos
-            arch: amd64
-            binary_name: syntaxpresso-core
             output_name: syntaxpresso-core-macos-amd64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            platform: macos
-            arch: arm64
             binary_name: syntaxpresso-core
+          - os: macos-latest # latest is Apple Silicon
+            target: aarch64-apple-darwin
             output_name: syntaxpresso-core-macos-arm64
+            binary_name: syntaxpresso-core
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            platform: windows
-            arch: amd64
-            binary_name: syntaxpresso-core.exe
             output_name: syntaxpresso-core-windows-amd64.exe
+            binary_name: syntaxpresso-core.exe
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -107,7 +98,7 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Cache cargo registry
+      - name: Cache cargo
         uses: actions/cache@v3
         with:
           path: |
@@ -115,11 +106,14 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
 
       - name: Install cross-compilation dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.target != 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update
+          # Add cross-compilation targets here if needed, e.g., gcc-multilib
           sudo apt-get install -y gcc-multilib
 
       - name: Build release binary
@@ -127,39 +121,3 @@ jobs:
         with:
           command: build
           args: --release --target ${{ matrix.target }}
-
-      - name: Rename binary for platform
-        run: |
-          if [ -f "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" ]; then
-            cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "${{ matrix.output_name }}"
-            echo "Copied ${{ matrix.binary_name }} to ${{ matrix.output_name }}"
-          else
-            echo "Binary ${{ matrix.binary_name }} not found!"
-            ls -la target/${{ matrix.target }}/release/
-            exit 1
-          fi
-        shell: bash
-
-      - name: Make binary executable (Unix)
-        if: matrix.platform != 'windows'
-        run: |
-          chmod +x "${{ matrix.output_name }}"
-          echo "Made ${{ matrix.output_name }} executable"
-
-      - name: Verify renamed binary
-        run: |
-          if [ -f "${{ matrix.output_name }}" ]; then
-            echo "Successfully created ${{ matrix.output_name }}"
-            ls -la "${{ matrix.output_name }}"
-          else
-            echo "Failed to create ${{ matrix.output_name }}"
-            exit 1
-          fi
-        shell: bash
-
-      - name: Upload binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: develop-binary-${{ matrix.platform }}-${{ matrix.arch }}
-          path: ${{ matrix.output_name }}
-          retention-days: 7
