@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: main
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -86,9 +86,11 @@ jobs:
           echo "New version: $NEW_VERSION"
 
           # Update Cargo.toml version
-          sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
-          git add Cargo.toml
-          git commit -m "chore: bump version to $NEW_VERSION" || echo "No changes to commit"
+           sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
+           git add Cargo.toml
+           git commit -m "chore: bump version to $NEW_VERSION"
+           git push origin main
+
 
           # Set output (tag creation moved to final step)
           echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
