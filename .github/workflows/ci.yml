@@ -61,7 +61,7 @@ jobs:
       - name: Run cargo-dist plan
         # This single action installs Rust, cargo-dist, and runs 'plan'
         # Using the commit SHA for v0.30.2
-        uses: axodotdev/cargo-dist@cc9747915e199fe974837a04adf6bd0648ee718d
+        uses: axodotdev/cargo-dist@v0.30.2
         with:
           command: plan
           pr-comment: true # Posts the plan as a PR comment
