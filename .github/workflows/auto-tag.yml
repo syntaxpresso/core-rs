@@ -10,7 +10,7 @@ jobs:
     name: Create and Push Tag
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed to push the new tag
+      contents: write # This is still good practice
 
     steps:
       - name: Checkout code
@@ -18,7 +18,6 @@ jobs:
 
       - name: Get version from Cargo.toml
         id: get_version
-        # Reads the version from your specific Cargo.toml path
         run: |
           VERSION=$(grep '^version = ' core-main/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -36,12 +35,18 @@ jobs:
             echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           fi
 
+      # --- MODIFIED STEP ---
       - name: Create and Push Tag
-        # Only runs if the tag from Cargo.toml doesn't exist yet
         if: steps.check_tag.outputs.exists == 'false'
+        env:
+          # Use the PAT secret here
+          GH_TOKEN: ${{ secrets.AUTO_TAG_TOKEN }}
+          TAG_NAME: ${{ steps.check_tag.outputs.tag_name }}
         run: |
           TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME"
+
+          # Authenticate the push using the PAT
+          git push https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}.git "$TAG_NAME"
