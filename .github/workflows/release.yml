@@ -1,273 +1,46 @@
-# This workflow triggers *after* a PR from 'develop' is merged into 'main'.
-# It handles the entire release process in one go:
-# 1. Calculates the new version based on PR labels.
-# 2. Builds all release binaries.
-# 3. Creates a new tag and a GitHub Release with the binaries.
-# 4. Creates a new PR to bump the version in 'Cargo.toml' on the 'main' branch.
-# 5. Automatically merges that new PR.
+# This workflow is triggered *only* when you push a new tag (e.g., v0.1.6).
+# It uses cargo-dist to build all binaries, package them,
+# and create a professional GitHub release.
+# This single file replaces all the complexity of the previous release.yml.
 
-name: Create Release
+name: Release with cargo-dist
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*" # Runs on any semver tag like v0.1.0
 
 jobs:
-  # This job only runs if the merged PR was from 'develop'
+  # This job does everything: builds, packages, and creates the release
   release:
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop' && !contains(github.event.pull_request.labels.*.name, 'documentation') }}
     runs-on: ubuntu-latest
-    # Set permissions for creating releases, tags, and pushing to 'develop'
+    # Grant permissions for cargo-dist to create the release
     permissions:
-      contents: write # To create releases, tags, and push commits
-      pull-requests: read # To read PR labels
-
-    outputs:
-      version: ${{ steps.calculate_version.outputs.VERSION }}
+      contents: write
 
     steps:
-      # Step 1: Calculate the new version
-      - name: Checkout main branch
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Need history for git describe
-          ref: main
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Get current version and calculate next
-        id: calculate_version
-        run: |
-          # Get the latest tag directly from Git
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag from Git: '$LATEST_TAG'"
-          CURRENT_VERSION=${LATEST_TAG#v}
-
-          if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Could not parse version from tag. Got: '$CURRENT_VERSION'"
-            echo "Setting fallback version to 0.0.1"
-            CURRENT_VERSION="0.0.1"
-          fi
-          echo "Current version: $CURRENT_VERSION"
-
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-
-          # Get labels from the merged PR
-          PR_LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
-          echo "PR Labels: $PR_LABELS"
-
-          if [[ $(echo "$PR_LABELS" | grep -q 'feature') || $(echo "$PR_LABELS" | grep -q 'enhancement') ]]; then
-            echo "Incrementing minor version for feature/enhancement"
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          elif [[ $(echo "$PR_LABELS" | grep -q 'bug') || $(echo "$PR_LABELS" | grep -q 'patch') ]]; then
-            echo "Incrementing patch version for bug/patch"
-            PATCH=$((PATCH + 1))
-          else
-            echo "No versioning label found ('feature', 'enhancement', 'bug', 'patch'). Defaulting to patch bump."
-            PATCH=$((PATCH + 1))
-          fi
-
-          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          echo "New version: $NEW_VERSION"
-          echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-  # Job 2: Build all release binaries
-  # We run this as a separate job to parallelize the builds
-  build-release-binaries:
-    needs: release # Wait for version calculation
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            output_name: syntaxpresso-core-linux-amd64
-            binary_name: syntaxpresso-core
-          - os: macos-13
-            target: x86_64-apple-darwin
-            output_name: syntaxpresso-core-macos-amd64
-            binary_name: syntaxpresso-core
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            output_name: syntaxpresso-core-macos-arm64
-            binary_name: syntaxpresso-core
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            output_name: syntaxpresso-core-windows-amd64.exe
-            binary_name: syntaxpresso-core.exe
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout merged commit
-        uses: actions/checkout@v4
-        with:
-          # Check out the exact commit that was merged into main
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
-
-      - name: Set up Rust
+      - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.target }}
           profile: minimal
           override: true
 
-      - name: Cache cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-
+      - name: Set up cargo-dist
+        # This downloads and installs cargo-dist
+        uses: axodotdev/cargo-dist/base-setup@v0.11.1
 
-      - name: Install cross-compilation dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest' && matrix.target != 'x86_64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib
-
-      - name: Build release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
-
-      - name: Prepare binary for upload
-        run: |
-          # Find the binary path
-          BINARY_PATH="target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
-          echo "Binary path is: $BINARY_PATH"
-
-          # Verify it exists
-          if [ ! -f "$BINARY_PATH" ]; then
-            echo "Error: Binary not found at $BINARY_PATH"
-            ls -la "target/${{ matrix.target }}/release/"
-            exit 1
-          fi
-
-          # Copy to the output name
-          cp "$BINARY_PATH" "${{ matrix.output_name }}"
-
-          # Make executable (for Unix-like OSes)
-          if [ "${{ matrix.os }}" != "windows-latest" ]; then
-            chmod +x "${{ matrix.output_name }}"
-          fi
-        shell: bash
-
-      - name: Upload binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binary-${{ matrix.output_name }}
-          path: ${{ matrix.output_name }}
-          retention-days: 1 # Only need it for the next job
-
-  # Job 3: Create the GitHub Release and upload binaries
-  create-github-release:
-    needs: [release, build-release-binaries]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # To create releases and tags
-    steps:
-      - name: Download all release binaries
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-          # This pattern will download all artifacts starting with 'release-binary-'
-          pattern: release-binary-*
-          merge-multiple: true # Merges all artifacts into the 'release-assets' dir
-
-      - name: List downloaded files
-        run: |
-          echo "Downloaded assets:"
-          ls -la release-assets/
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.release.outputs.version }}
-          # Tag the exact merge commit
-          target_commitish: ${{ github.event.pull_request.merge_commit_sha }}
-          generate_release_notes: true
-          files: release-assets/*
+      - name: Run cargo-dist
+        # This is the magic step. It:
+        # 1. Builds your app for all configured targets.
+        # 2. Packages them into .zip and .tar.gz archives.
+        # 3. Creates installer scripts (.sh, .ps1).
+        # 4. Generates checksums.
+        # 5. Creates a beautiful GitHub Release and uploads everything.
+        run: cargo dist build --output-format=github
         env:
+          # This token is built-in. No PAT is needed!
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Job 4: Create PR to bump version in 'main'
-  bump-version-in-main:
-    needs: [create-github-release, release] # Explicitly need 'release' job for output
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # To push a new branch
-      pull-requests: write # To create a pull request
-    steps:
-      - name: Checkout main branch
-        uses: actions/checkout@v4
-        with:
-          ref: main # Checkout main branch
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create and push version bump branch
-        id: create_branch
-        run: |
-          NEW_VERSION="${{ needs.release.outputs.version }}"
-
-          # Fail fast if the version is empty from a partial re-run
-          if [ -z "$NEW_VERSION" ]; then
-            echo "Error: NEW_VERSION is empty. This can happen if you re-run only this job."
-            echo "Please re-run the entire workflow from the beginning."
-            exit 1
-          fi
-
-          BRANCH_NAME="version-v${NEW_VERSION}"
-          echo "Creating branch: $BRANCH_NAME"
-
-          # Create branch off main (which is already checked out)
-          git checkout -b $BRANCH_NAME
-
-          # Update Cargo.toml
-          sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
-
-          git add Cargo.toml
-          if git diff --staged --quiet; then
-            echo "No changes to commit. Cargo.toml might already be at the new version."
-            echo "BRANCH_CREATED=false" >> $GITHUB_OUTPUT
-          else
-            git commit -m "Update version to $NEW_VERSION after release"
-            # Use --force to overwrite the branch if it exists from a previous failed run
-            git push --force origin $BRANCH_NAME
-            echo "BRANCH_CREATED=true" >> $GITHUB_OUTPUT
-            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Pull Request to main
-        if: steps.create_branch.outputs.BRANCH_CREATED == 'true'
-        run: |
-          gh pr create \
-            --base main \
-            --head ${{ steps.create_branch.outputs.BRANCH_NAME }} \
-            --title "Update version to ${{ needs.release.outputs.version }}" \
-            --body "Automated version bump following release of v${{ needs.release.outputs.version }}."
-        env:
-          # Use a Personal Access Token (PAT) stored as a repository secret.
-          # The default GITHUB_TOKEN is restricted from creating PRs
-          # in workflows triggered by 'pull_request' to prevent CI loops.
-          GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
-
-      - name: Enable Auto-Merge for the PR
-        if: steps.create_branch.outputs.BRANCH_CREATED == 'true'
-        run: |
-          gh pr merge ${{ steps.create_branch.outputs.BRANCH_NAME }} --auto --squash --delete-branch
-        env:
-          # Use the same PAT to merge the PR
-          GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
