@@ -1,24 +1,20 @@
-# This workflow runs on Pull Requests targeting the 'develop' branch.
-# Its only job is to ensure code quality and that the release binaries
-# can be successfully built before allowing a merge into 'develop'.
+# This workflow runs on Pull Requests to 'develop' or 'main'
+# It runs tests, lints, and uses 'cargo dist plan' to
+# post a comment on the PR showing what a release would look like.
 
-name: Develop Branch CI
-
+name: CI
 on:
   pull_request:
     branches:
       - develop
-
+      - main
 jobs:
-  # Job 1: Run lints, tests, and a basic build
-  test-and-build:
-    # Don't run on PRs labeled 'documentation'
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
+  # Job 1: Run lints, tests
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -26,7 +22,6 @@ jobs:
           profile: minimal
           override: true
           components: rustfmt, clippy
-
       - name: Cache cargo
         uses: actions/cache@v3
         with:
@@ -35,89 +30,43 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-test-
-
       - name: Run cargo fmt check
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-
       - name: Run clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
-
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --workspace
 
-      - name: Build project (Debug)
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-
-  # Job 2: Build all release binaries as a check
-  build-native-check:
-    # This job ensures the binaries for all targets can be compiled.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'documentation') }}
-    needs: test-and-build
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            output_name: syntaxpresso-core-linux-amd64
-            binary_name: syntaxpresso-core
-          - os: macos-13 # Using older macOS for x86_64
-            target: x86_64-apple-darwin
-            output_name: syntaxpresso-core-macos-amd64
-            binary_name: syntaxpresso-core
-          - os: macos-latest # latest is Apple Silicon
-            target: aarch64-apple-darwin
-            output_name: syntaxpresso-core-macos-arm64
-            binary_name: syntaxpresso-core
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            output_name: syntaxpresso-core-windows-amd64.exe
-            binary_name: syntaxpresso-core.exe
-    runs-on: ${{ matrix.os }}
+  # Job 2: Check the cargo-dist release plan
+  plan:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to post a comment on the PR
+      pull-requests: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Rust
+      - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.target }}
           profile: minimal
           override: true
-
-      - name: Cache cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-
-
-      - name: Install cross-compilation dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest' && matrix.target != 'x86_64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          # Add cross-compilation targets here if needed, e.g., gcc-multilib
-          sudo apt-get install -y gcc-multilib
-
-      - name: Build release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
+      - name: Set up cargo-dist
+        uses: axodotdev/cargo-dist/base-setup@v0.11.1
+      - name: Run cargo-dist plan
+        # This posts a comment on the PR with the release plan
+        run: cargo dist plan --output-format=github-pr-comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
