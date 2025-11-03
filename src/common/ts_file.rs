@@ -236,6 +236,10 @@ impl TSFile {
       .validate_path_containment(path)
       .map_err(|e| std::io::Error::other(format!("Path security validation failed: {}", e)))?;
     // Save using the validated path
+    // Create parent directories if they don't exist
+    if let Some(parent) = validated_path.parent() {
+      fs::create_dir_all(parent)?;
+    }
     fs::write(&validated_path, &self.source_code)?;
     self.file = Some(validated_path);
     self.modified = false;
