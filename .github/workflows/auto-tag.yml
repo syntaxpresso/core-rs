@@ -15,12 +15,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.AUTO_TAG_TOKEN }}
+          fetch-depth: 0
 
-      # --- MODIFIED STEP ---
       - name: Get version from Cargo.toml
         id: get_version
         run: |
-          # Use sed to find the version line, ignore leading whitespace, and extract the value
           VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -37,15 +38,13 @@ jobs:
             echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           fi
 
-      # --- MODIFIED STEP ---
       - name: Create and Push Tag
         if: steps.check_tag.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.AUTO_TAG_TOKEN }}
-          TAG_NAME: ${{ steps.check_tag.outputs.tag_name }}
         run: |
           TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$TAG_NAME" -m "Release $TAG_NAME"
-          git push https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}.git "$TAG_NAME"
+          git push origin "$TAG_NAME"
+        env:
+          GITHUB_TOKEN: ${{ secrets.AUTO_TAG_TOKEN }}
