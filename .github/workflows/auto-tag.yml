@@ -21,7 +21,7 @@ jobs:
         id: get_version
         run: |
           # Use sed to find the version line, ignore leading whitespace, and extract the value
-          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' core-main/Cargo.toml)
+          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if tag exists
