@@ -4,6 +4,7 @@
 # 2. Builds all release binaries.
 # 3. Creates a new tag and a GitHub Release with the binaries.
 # 4. Creates a new PR to bump the version in 'Cargo.toml' on the 'main' branch.
+# 5. Automatically merges that new PR.
 
 name: Create Release
 
@@ -228,7 +229,7 @@ jobs:
             exit 1
           fi
 
-          BRANCH_NAME="chore/bump-version-v${NEW_VERSION}"
+          BRANCH_NAME="version-v${NEW_VERSION}"
           echo "Creating branch: $BRANCH_NAME"
 
           # Create branch off main (which is already checked out)
@@ -242,7 +243,7 @@ jobs:
             echo "No changes to commit. Cargo.toml might already be at the new version."
             echo "BRANCH_CREATED=false" >> $GITHUB_OUTPUT
           else
-            git commit -m "chore: bump version to $NEW_VERSION after release"
+            git commit -m "Update version to $NEW_VERSION after release"
             # Use --force to overwrite the branch if it exists from a previous failed run
             git push --force origin $BRANCH_NAME
             echo "BRANCH_CREATED=true" >> $GITHUB_OUTPUT
@@ -255,10 +256,18 @@ jobs:
           gh pr create \
             --base main \
             --head ${{ steps.create_branch.outputs.BRANCH_NAME }} \
-            --title "chore: Bump version to ${{ needs.release.outputs.version }}" \
+            --title "Update version to ${{ needs.release.outputs.version }}" \
             --body "Automated version bump following release of v${{ needs.release.outputs.version }}."
         env:
           # Use a Personal Access Token (PAT) stored as a repository secret.
           # The default GITHUB_TOKEN is restricted from creating PRs
           # in workflows triggered by 'pull_request' to prevent CI loops.
+          GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
+
+      - name: Enable Auto-Merge for the PR
+        if: steps.create_branch.outputs.BRANCH_CREATED == 'true'
+        run: |
+          gh pr merge ${{ steps.create_branch.outputs.BRANCH_NAME }} --auto --squash --delete-branch
+        env:
+          # Use the same PAT to merge the PR
           GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
