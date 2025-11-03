@@ -18,8 +18,8 @@ jobs:
     # Only run if PR was merged (not just closed) and source branch was develop
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     outputs:
-      tag_name: ${{ steps.create_tag.outputs.tag_name }}
-      tag_created: ${{ steps.create_tag.outputs.tag_created }}
+      tag_name: ${{ steps.create_tag.outputs.tag_name || steps.check_tag.outputs.tag_name }}
+      tag_created: ${{ steps.create_tag.outputs.tag_created || 'false' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,10 +39,11 @@ jobs:
         run: |
           TAG_NAME="v${{ steps.get_version.outputs.version }}"
           if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Tag $TAG_NAME already exists. Skipping release."
+            echo "Tag $TAG_NAME already exists. Skipping tag creation."
             echo "exists=true" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           else
-            echo "Tag $TAG_NAME does not exist. Proceeding with release."
+            echo "Tag $TAG_NAME does not exist. Proceeding with tag creation."
             echo "exists=false" >> $GITHUB_OUTPUT
             echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           fi
