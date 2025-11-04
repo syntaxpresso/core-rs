@@ -11,71 +11,70 @@ permissions:
   contents: write
 
 jobs:
-  # This job replaces both 'bump-and-tag' and 'create-tag'
-  bump-and-tag-release:
-    name: Bump Version and Create Release Tag
+  update-version-and-create-tag:
+    name: Update project version and create tag
     runs-on: ubuntu-latest
-
-    # Combined 'if' conditions
     if: >
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.ref == 'develop' &&
-      !contains(github.event.pull_request.head_commit.message, 'Bump version to')
-
+      !contains(github.event.pull_request.head_commit.message, 'Update version to')
     outputs:
       version: ${{ steps.bump.outputs.new_version }}
       tag_name: ${{ steps.bump.outputs.new_tag }}
       tag_created: ${{ steps.bump.outputs.tag_created }}
-
     steps:
-      - name: Check out code
+      - name: Checout to main
         uses: actions/checkout@v4
         with:
-          ref: main # Check out main, which now contains the merged PR
-          token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing back to main
-
-      - name: Configure Git
+          ref: main
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0 # Fetch all history to find the last tag correctly
+      - name: Configure git
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-      - name: Bump version and create tag
+          git config --global user.name 'Syntaxpresso[bot]'
+          git config --global user.email 'bot@syntaxpresso.github.io'
+      - name: Update version and create tag
         id: bump
         run: |
-          # Get current version from Cargo.toml
-          VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
-          echo "Current version: $VERSION"
-
-          # Increment the patch version (e.g., 0.0.2 -> 0.0.3)
-          OLD_IFS=$IFS; IFS='.'; read -r -a VERSION_PARTS <<< "$VERSION"; IFS=$OLD_IFS
-          VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
-          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+          CURRENT_VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version from Cargo.toml: $CURRENT_VERSION"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          echo "Parsed version: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
+          # Determine version increment based on labels
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]]; then
+            echo "Breaking change label found. Incrementing MAJOR version."
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
+            echo "Enhancement label found. Incrementing MINOR version."
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            # This 'else' block handles 'fix' label or no label at all
+            echo "Fix/default label logic. Incrementing PATCH version."
+            PATCH=$((PATCH + 1))
+          fi
+          # Create new version string
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "New version: $NEW_VERSION"
-
-          # Update Cargo.toml
-          sed -i "s/version = \"$VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
-
+          # Update Cargo.toml (using the original $CURRENT_VERSION to find and replace)
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
           # Commit the version bump
           git add Cargo.toml
           git commit -m "Bump version to $NEW_VERSION"
-
           # Create an ANNOTATED tag so --follow-tags will push it
           NEW_TAG="v$NEW_VERSION"
           git tag -a $NEW_TAG -m "Release $NEW_TAG"
-
           # Set the output for the next job
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
           echo "tag_created=true" >> $GITHUB_OUTPUT
-
       - name: Push commit and tag
         run: git push origin main --follow-tags
-
-  # This job builds the native binaries for multiple platforms
-  build-native:
-    # Only run if the first job created a tag
-    if: needs.bump-and-tag-release.outputs.tag_created == 'true'
-    needs: bump-and-tag-release
+  build-binaries:
+    if: needs.update-version-and-create-tag.outputs.tag_created == 'true'
+    needs: update-version-and-create-tag
     strategy:
       matrix:
         include:
@@ -109,10 +108,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           # This is critical: check out the NEW tag from the previous job
-          ref: ${{ needs.bump-and-tag-release.outputs.tag_name }}
+          ref: ${{ needs.update-version-and-create-tag.outputs.tag_name }}
           # This prevents the race condition where the tag isn't found
           fetch-depth: 0
-
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -120,19 +118,16 @@ jobs:
           target: ${{ matrix.target }}
           profile: minimal
           override: true
-
       - name: Install cross-compilation dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-multilib
-
       - name: Build release binary
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --target ${{ matrix.target }}
-
       - name: Rename binary for platform
         run: |
           if [ -f "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" ]; then
@@ -144,13 +139,11 @@ jobs:
             exit 1
           fi
         shell: bash
-
       - name: Make binary executable (Unix)
         if: matrix.platform != 'windows'
         run: |
           chmod +x "${{ matrix.output_name }}"
           echo "Made ${{ matrix.output_name }} executable"
-
       - name: Verify renamed binary
         run: |
           if [ -f "${{ matrix.output_name }}" ]; then
@@ -161,40 +154,32 @@ jobs:
             exit 1
           fi
         shell: bash
-
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.platform }}-${{ matrix.arch }}
           path: ${{ matrix.output_name }}
           retention-days: 1
-
-  # This job creates the GitHub Release and uploads the binaries
-  create-release:
+  release:
     # Only run if the first job created a tag
-    if: needs.bump-and-tag-release.outputs.tag_created == 'true'
-    needs: [bump-and-tag-release, build-native]
+    if: needs.update-version-and-create-tag.outputs.tag_created == 'true'
+    needs: [update-version-and-create-tag, build-binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: read
     steps:
-      # --- THIS IS THE FIX ---
-      # You must check out the code so that 'gh'
-      # can access the Git history to create the release.
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           # Check out the new tag
-          ref: ${{ needs.bump-and-tag-release.outputs.tag_name }}
+          ref: ${{ needs.update-version-and-create-tag.outputs.tag_name }}
           # Fetch all history so 'gh release create' can generate notes
           fetch-depth: 0
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: binaries
-
       - name: List downloaded files
         run: |
           echo "Contents of binaries directory:"
@@ -205,7 +190,6 @@ jobs:
             echo "Contents of $dir:"
             ls -la "$dir"
           done
-
       - name: Prepare release files
         run: |
           mkdir -p release-files
@@ -219,12 +203,11 @@ jobs:
           chmod +x release-files/syntaxpresso-core-macos-arm64 || true
           echo "Final release files with permissions:"
           ls -la release-files/
-
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Get the tag name from the first job
-          TAG_NAME: ${{ needs.bump-and-tag-release.outputs.tag_name }}
+          TAG_NAME: ${{ needs.update-version-and-create-tag.outputs.tag_name }}
         run: |
           echo "Creating release for ${TAG_NAME}"
           gh release create ${TAG_NAME} \
