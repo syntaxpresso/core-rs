@@ -121,7 +121,7 @@ jobs:
             arch: amd64
             binary_name: syntaxpresso-core
             output_name: syntaxpresso-core-linux-amd64
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             platform: macos
             arch: amd64
