@@ -60,9 +60,9 @@ jobs:
           git add Cargo.toml
           git commit -m "Bump version to $NEW_VERSION"
 
-          # Create the new tag
+          # Create an ANNOTATED tag so --follow-tags will push it
           NEW_TAG="v$NEW_VERSION"
-          git tag $NEW_TAG
+          git tag -a $NEW_TAG -m "Release $NEW_TAG"
 
           # Set the output for the next job
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
@@ -89,6 +89,9 @@ jobs:
           ref: ${{ needs.bump-and-tag-release.outputs.tag_name }}
           persist-credentials: false
           submodules: recursive
+
+          # This fetches the entire history, ensuring the new tag is found
+          # and avoids the race condition.
           fetch-depth: 0
 
       - name: Install dist
