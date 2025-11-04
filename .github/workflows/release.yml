@@ -55,13 +55,26 @@ jobs:
           # Create new version string
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "New version: $NEW_VERSION"
+
+          # Check if the tag already exists (idempotency check)
+          NEW_TAG="v$NEW_VERSION"
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "⚠️  Tag $NEW_TAG already exists. Skipping version bump."
+            echo "This workflow is idempotent - safe to rerun."
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+            echo "tag_created=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "✓ Tag $NEW_TAG does not exist. Proceeding with version bump."
           # Update Cargo.toml (using the original $CURRENT_VERSION to find and replace)
           sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
-          # Commit the version bump
-          git add Cargo.toml
+          # Update Cargo.lock to reflect the new version
+          cargo update --workspace --offline || cargo update --workspace
+          # Commit both Cargo.toml and Cargo.lock
+          git add Cargo.toml Cargo.lock
           git commit -m "Update version to $NEW_VERSION"
           # Create an ANNOTATED tag so --follow-tags will push it
-          NEW_TAG="v$NEW_VERSION"
           git tag -a $NEW_TAG -m "Release $NEW_TAG"
           # Set the output for the next job
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
