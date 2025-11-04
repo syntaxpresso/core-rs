@@ -1,35 +1,31 @@
 name: Release
 
 on:
-  push:
+  pull_request:
     branches:
-      - main # Run when a PR is merged into main
+      - main
+    types:
+      - closed
 
 permissions:
   contents: write
 
 jobs:
-  # -----------------------------------------------------------------
-  # JOB 1: Bump version, commit, tag, and push
-  # -----------------------------------------------------------------
   bump-and-tag:
     runs-on: ubuntu-latest
-    # This check prevents the workflow from re-triggering itself.
     if: "!contains(github.event.head_commit.message, 'Bump version to')"
     outputs:
       new_tag: ${{ steps.bump.outputs.new_tag }} # Output the new tag for the next job
-
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing to main
-          fetch-depth: 0 # Fetch full history to find current version tag
 
       - name: Configure Git
         run: |
-          git config --global user.name 'Syntaxpresso[bot]'
-          git config --global user.email 'bot@syntaxpresso.github.io'
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Bump version and create tag
         id: bump
@@ -60,27 +56,73 @@ jobs:
 
       - name: Push commit and tag
         run: git push origin main --follow-tags
+  # Step 1: Create the tag (only if PR was merged and came from develop)
+  create-tag:
+    name: Create Release Tag
+    runs-on: ubuntu-latest
+    # Only run if PR was merged (not just closed) and source branch was develop
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    outputs:
+      tag_name: ${{ steps.create_tag.outputs.tag_name || steps.check_tag.outputs.tag_name }}
+      tag_created: ${{ steps.create_tag.outputs.tag_created || 'false' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main # Checkout main branch after merge
 
-  # -----------------------------------------------------------------
-  # JOB 2: Plan the cargo-dist release
-  # -----------------------------------------------------------------
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          TAG_NAME="v${{ steps.get_version.outputs.version }}"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists. Skipping tag creation."
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $TAG_NAME does not exist. Proceeding with tag creation."
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and Push Tag
+        id: create_tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "tag_created=true" >> $GITHUB_OUTPUT
+          echo "Tag $TAG_NAME created and pushed successfully"
+
+  # Rest of the jobs remain the same...
   plan:
-    needs: bump-and-tag
+    needs: create-tag
+    if: needs.create-tag.outputs.tag_created == 'true'
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ needs.bump-and-tag.outputs.new_tag }}
-      tag-flag: ${{ format('--tag={0}', needs.bump-and-tag.outputs.new_tag) }}
+      tag: ${{ needs.create-tag.outputs.tag_name }}
+      tag-flag: ${{ format('--tag={0}', needs.create-tag.outputs.tag_name) }}
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_PAT  }}
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use PAT to see the new tag
-          ref: ${{ needs.bump-and-tag.outputs.new_tag }} # Checkout the new tag
+          ref: ${{ needs.create-tag.outputs.tag_name }}
           persist-credentials: false
           submodules: recursive
-          fetch-depth: 0 # <-- ⬇️⬇️ THE FIX: Fetch full history to find the new tag
 
       - name: Install dist
         shell: bash
@@ -94,7 +136,7 @@ jobs:
 
       - id: plan
         run: |
-          dist host --steps=create --tag=${{ needs.bump-and-tag.outputs.new_tag }} --output-format=json > plan-dist-manifest.json
+          dist host --steps=create --tag=${{ needs.create-tag.outputs.tag_name }} --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
@@ -105,9 +147,7 @@ jobs:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
 
-  # -----------------------------------------------------------------
-  # JOB 3: Build platform-specific artifacts
-  # -----------------------------------------------------------------
+  # Step 3: Build platform-specific artifacts
   build-local-artifacts:
     name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
     needs:
@@ -119,7 +159,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container && matrix.container.image || null }}
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
       BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
     steps:
       - name: enable windows longpaths
@@ -128,16 +168,14 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use PAT to see the new tag
           ref: ${{ needs.plan.outputs.tag }}
           persist-credentials: false
           submodules: recursive
-          fetch-depth: 0 # <-- ⬇️⬇️ THE FIX: Fetch full history to find the new tag
 
       - name: Install Rust non-interactively if not already installed
         if: ${{ matrix.container }}
         run: |
-          if ! command -v cargo > /dev/null 2&>1; then
+          if ! command -v cargo > /dev/null 2>&1; then
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
@@ -178,25 +216,21 @@ jobs:
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
 
-  # -----------------------------------------------------------------
-  # JOB 4: Build global artifacts
-  # -----------------------------------------------------------------
+  # Step 4: Build global artifacts
   build-global-artifacts:
     needs:
       - plan
       - build-local-artifacts
     runs-on: "ubuntu-22.04"
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use PAT to see the new tag
           ref: ${{ needs.plan.outputs.tag }}
           persist-credentials: false
           submodules: recursive
-          fetch-depth: 0 # <-- ⬇️⬇️ THE FIX: Fetch full history to find the new tag
 
       - name: Install cached dist
         uses: actions/download-artifact@v4
@@ -231,9 +265,7 @@ jobs:
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
 
-  # -----------------------------------------------------------------
-  # JOB 5: Create the GitHub Release
-  # -----------------------------------------------------------------
+  # Step 5: Create the GitHub Release
   host:
     needs:
       - plan
@@ -241,18 +273,16 @@ jobs:
       - build-global-artifacts
     if: ${{ always() && needs.plan.result == 'success' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use PAT to see the new tag
           ref: ${{ needs.plan.outputs.tag }}
           persist-credentials: false
           submodules: recursive
-          fetch-depth: 0 # <-- ⬇️⬇️ THE FIX: Fetch full history to find the new tag
 
       - name: Install cached dist
         uses: actions/download-artifact@v4
@@ -304,9 +334,6 @@ jobs:
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
-  # -----------------------------------------------------------------
-  # JOB 6: Announce
-  # -----------------------------------------------------------------
   announce:
     needs:
       - plan
@@ -314,11 +341,9 @@ jobs:
     if: ${{ always() && needs.host.result == 'success' }}
     runs-on: "ubuntu-22.04"
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use PAT to see the new tag
           persist-credentials: false
           submodules: recursive
-          fetch-depth: 0 # <-- ⬇️⬇️ THE FIX: Fetch full history to find the new tag
