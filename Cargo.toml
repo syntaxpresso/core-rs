@@ -1,6 +1,6 @@
 [package]
 name = "syntaxpresso-core"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 repository = "https://github.com/syntaxpresso/core"
 
@@ -17,8 +17,3 @@ base64 = "0.22.1"
 
 [dev-dependencies]
 tempfile = "3.8"
-
-# The profile that 'dist' will build with
-[profile.dist]
-inherits = "release"
-lto = "thin"
