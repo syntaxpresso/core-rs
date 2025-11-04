@@ -41,19 +41,61 @@ jobs:
           echo "Parsed version: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
           CURRENT_TAG="v$CURRENT_VERSION"
           SHOULD_UPDATE_VERSION=true
-          # Check if current version has an orphaned tag
+          # Check if current version has a tag
           if git rev-parse "$CURRENT_TAG" >/dev/null 2>&1; then
             echo "⚠️  Tag $CURRENT_TAG exists for current version"
+            
             # Check if it has a release
             if gh release view "$CURRENT_TAG" >/dev/null 2>&1; then
               echo "✓ Release already exists for $CURRENT_TAG"
-              echo "This workflow is idempotent - safe to rerun."
-              echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-              echo "new_tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
-              echo "tag_created=false" >> $GITHUB_OUTPUT
-              exit 0
+              echo "New PR merged - calculating next version based on label"
+              # SITUATION 2: Current version has tag AND release
+              # Calculate NEXT_VERSION first to check if it exists
+              TEMP_MAJOR=$MAJOR
+              TEMP_MINOR=$MINOR
+              TEMP_PATCH=$PATCH
+              
+              if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]]; then
+                TEMP_MAJOR=$((TEMP_MAJOR + 1))
+                TEMP_MINOR=0
+                TEMP_PATCH=0
+              elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
+                TEMP_MINOR=$((TEMP_MINOR + 1))
+                TEMP_PATCH=0
+              else
+                TEMP_PATCH=$((TEMP_PATCH + 1))
+              fi
+              
+              NEXT_VERSION="${TEMP_MAJOR}.${TEMP_MINOR}.${TEMP_PATCH}"
+              NEXT_TAG="v$NEXT_VERSION"
+              
+              # Check if NEXT_VERSION tag exists
+              if git rev-parse "$NEXT_TAG" >/dev/null 2>&1; then
+                echo "⚠️  Tag $NEXT_TAG also exists"
+                
+                # Check if NEXT_VERSION has a release
+                if gh release view "$NEXT_TAG" >/dev/null 2>&1; then
+                  echo "✓ Release exists for $NEXT_TAG too - incrementing again"
+                  # Increment one more time
+                  TEMP_PATCH=$((TEMP_PATCH + 1))
+                  NEW_VERSION="${TEMP_MAJOR}.${TEMP_MINOR}.${TEMP_PATCH}"
+                  echo "New version will be: $NEW_VERSION"
+                  SHOULD_UPDATE_VERSION=true
+                else
+                  echo "⚠️  Tag $NEXT_TAG is orphaned - will create release for it"
+                  NEW_VERSION="$NEXT_VERSION"
+                  SHOULD_UPDATE_VERSION=false
+                fi
+              else
+                echo "Tag $NEXT_TAG doesn't exist - will create it"
+                NEW_VERSION="$NEXT_VERSION"
+                SHOULD_UPDATE_VERSION=true
+              fi
+              
             else
+              # SITUATION 1: Current version has orphaned tag (no release)
               echo "⚠️  Tag $CURRENT_TAG is orphaned (no release exists)"
+              
               # Determine action based on label type
               if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]] || \
                  [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
@@ -73,7 +115,11 @@ jobs:
                 SHOULD_UPDATE_VERSION=false
               fi
             fi
+          else
+            echo "Tag $CURRENT_TAG doesn't exist - normal version bump"
+            SHOULD_UPDATE_VERSION=true
           fi
+          
           # Calculate new version if needed
           if [ "$SHOULD_UPDATE_VERSION" = true ]; then
             # Determine version increment based on labels
@@ -93,6 +139,7 @@ jobs:
             fi
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
             echo "New version: $NEW_VERSION"
+            
             # Update Cargo.toml
             sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
             # Update Cargo.lock to reflect the new version
@@ -103,9 +150,11 @@ jobs:
           else
             echo "Using existing version: $NEW_VERSION (no Cargo.toml update needed)"
           fi
+          
           # Create an ANNOTATED tag so --follow-tags will push it
           NEW_TAG="v$NEW_VERSION"
           git tag -a $NEW_TAG -m "Release $NEW_TAG"
+          
           # Set the output for the next job
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
