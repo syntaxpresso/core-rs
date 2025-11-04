@@ -179,6 +179,17 @@ jobs:
       contents: write
       pull-requests: read
     steps:
+      # --- THIS IS THE FIX ---
+      # You must check out the code so that 'gh'
+      # can access the Git history to create the release.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Check out the new tag
+          ref: ${{ needs.bump-and-tag-release.outputs.tag_name }}
+          # Fetch all history so 'gh release create' can generate notes
+          fetch-depth: 0
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
