@@ -11,16 +11,27 @@ permissions:
   contents: write
 
 jobs:
-  bump-and-tag:
+  # This new job replaces both 'bump-and-tag' and 'create-tag'
+  bump-and-tag-release:
+    name: Bump Version and Create Release Tag
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'Bump version to')"
+
+    # Combined 'if' conditions
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'develop' &&
+      !contains(github.event.pull_request.head_commit.message, 'Bump version to')
+
     outputs:
-      new_tag: ${{ steps.bump.outputs.new_tag }} # Output the new tag for the next job
+      tag_name: ${{ steps.bump.outputs.new_tag }}
+      tag_created: ${{ steps.bump.outputs.tag_created }}
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing to main
+          ref: main # Check out main, which now contains the merged PR
+          token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing back to main
 
       - name: Configure Git
         run: |
@@ -33,12 +44,14 @@ jobs:
           # Get current version from Cargo.toml
           VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
 
+          echo "Current version: $VERSION"
+
           # Increment the patch version (e.g., 0.0.2 -> 0.0.3)
           OLD_IFS=$IFS; IFS='.'; read -r -a VERSION_PARTS <<< "$VERSION"; IFS=$OLD_IFS
           VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
           NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
 
-          echo "Bumping version $VERSION to $NEW_VERSION"
+          echo "Bumping version to $NEW_VERSION"
 
           # Update Cargo.toml
           sed -i "s/version = \"$VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
@@ -53,74 +66,27 @@ jobs:
 
           # Set the output for the next job
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "tag_created=true" >> $GITHUB_OUTPUT
 
       - name: Push commit and tag
         run: git push origin main --follow-tags
-  # Step 1: Create the tag (only if PR was merged and came from develop)
-  create-tag:
-    name: Create Release Tag
-    runs-on: ubuntu-latest
-    # Only run if PR was merged (not just closed) and source branch was develop
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
-    outputs:
-      tag_name: ${{ steps.create_tag.outputs.tag_name || steps.check_tag.outputs.tag_name }}
-      tag_created: ${{ steps.create_tag.outputs.tag_created || 'false' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: main # Checkout main branch after merge
 
-      - name: Get version from Cargo.toml
-        id: get_version
-        run: |
-          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $VERSION"
-
-      - name: Check if tag exists
-        id: check_tag
-        run: |
-          TAG_NAME="v${{ steps.get_version.outputs.version }}"
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Tag $TAG_NAME already exists. Skipping tag creation."
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          else
-            echo "Tag $TAG_NAME does not exist. Proceeding with tag creation."
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create and Push Tag
-        id: create_tag
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME"
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "tag_created=true" >> $GITHUB_OUTPUT
-          echo "Tag $TAG_NAME created and pushed successfully"
-
-  # Rest of the jobs remain the same...
+  # The 'plan' job now depends on the new merged job
   plan:
-    needs: create-tag
-    if: needs.create-tag.outputs.tag_created == 'true'
+    needs: bump-and-tag-release
+    if: needs.bump-and-tag-release.outputs.tag_created == 'true'
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ needs.create-tag.outputs.tag_name }}
-      tag-flag: ${{ format('--tag={0}', needs.create-tag.outputs.tag_name) }}
+      tag: ${{ needs.bump-and-tag-release.outputs.tag_name }}
+      tag-flag: ${{ format('--tag={0}', needs.bump-and-tag-release.outputs.tag_name) }}
     env:
       GH_TOKEN: ${{ secrets.GH_PAT  }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.create-tag.outputs.tag_name }}
+          # Checkout the specific new tag created in the previous job
+          ref: ${{ needs.bump-and-tag-release.outputs.tag_name }}
           persist-credentials: false
           submodules: recursive
 
@@ -136,7 +102,8 @@ jobs:
 
       - id: plan
         run: |
-          dist host --steps=create --tag=${{ needs.create-tag.outputs.tag_name }} --output-format=json > plan-dist-manifest.json
+          # Use the new tag from the 'needs' context
+          dist host --steps=create --tag=${{ needs.bump-and-tag-release.outputs.tag_name }} --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
@@ -147,7 +114,7 @@ jobs:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
 
-  # Step 3: Build platform-specific artifacts
+  # No changes are needed for the jobs below
   build-local-artifacts:
     name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
     needs:
@@ -216,7 +183,6 @@ jobs:
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
 
-  # Step 4: Build global artifacts
   build-global-artifacts:
     needs:
       - plan
@@ -265,7 +231,6 @@ jobs:
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
 
-  # Step 5: Create the GitHub Release
   host:
     needs:
       - plan
