@@ -1,18 +1,20 @@
 name: Release
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
-    types:
-      - closed
+      - main # Run when a PR is merged into main
 
 permissions:
   contents: write
 
 jobs:
+  # -----------------------------------------------------------------
+  # JOB 1: Bump version, commit, tag, and push
+  # -----------------------------------------------------------------
   bump-and-tag:
     runs-on: ubuntu-latest
+    # This check prevents the workflow from re-triggering itself.
     if: "!contains(github.event.head_commit.message, 'Bump version to')"
     outputs:
       new_tag: ${{ steps.bump.outputs.new_tag }} # Output the new tag for the next job
@@ -57,71 +59,24 @@ jobs:
 
       - name: Push commit and tag
         run: git push origin main --follow-tags
-  # Step 1: Create the tag (only if PR was merged and came from develop)
-  create-tag:
-    name: Create Release Tag
-    runs-on: ubuntu-latest
-    # Only run if PR was merged (not just closed) and source branch was develop
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
-    outputs:
-      tag_name: ${{ steps.create_tag.outputs.tag_name || steps.check_tag.outputs.tag_name }}
-      tag_created: ${{ steps.create_tag.outputs.tag_created || 'false' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: main # Checkout main branch after merge
 
-      - name: Get version from Cargo.toml
-        id: get_version
-        run: |
-          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $VERSION"
-
-      - name: Check if tag exists
-        id: check_tag
-        run: |
-          TAG_NAME="v${{ steps.get_version.outputs.version }}"
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Tag $TAG_NAME already exists. Skipping tag creation."
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          else
-            echo "Tag $TAG_NAME does not exist. Proceeding with tag creation."
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create and Push Tag
-        id: create_tag
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME"
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "tag_created=true" >> $GITHUB_OUTPUT
-          echo "Tag $TAG_NAME created and pushed successfully"
-
-  # Rest of the jobs remain the same...
+  # -----------------------------------------------------------------
+  # JOB 2: Plan the cargo-dist release
+  # -----------------------------------------------------------------
   plan:
-    needs: create-tag
-    if: needs.create-tag.outputs.tag_created == 'true'
+    needs: bump-and-tag # <-- CHANGED: Now depends on bump-and-tag
+    # if: needs.create-tag.outputs.tag_created == 'true' # <-- REMOVED: No longer needed
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ needs.create-tag.outputs.tag_name }}
-      tag-flag: ${{ format('--tag={0}', needs.create-tag.outputs.tag_name) }}
+      tag: ${{ needs.bump-and-tag.outputs.new_tag }} # <-- CHANGED
+      tag-flag: ${{ format('--tag={0}', needs.bump-and-tag.outputs.new_tag) }} # <-- CHANGED
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.create-tag.outputs.tag_name }}
+          ref: ${{ needs.bump-and-tag.outputs.new_tag }} # <-- CHANGED
           persist-credentials: false
           submodules: recursive
 
@@ -137,7 +92,7 @@ jobs:
 
       - id: plan
         run: |
-          dist host --steps=create --tag=${{ needs.create-tag.outputs.tag_name }} --output-format=json > plan-dist-manifest.json
+          dist host --steps=create --tag=${{ needs.bump-and-tag.outputs.new_tag }} --output-format=json > plan-dist-manifest.json # <-- CHANGED
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
@@ -147,6 +102,17 @@ jobs:
         with:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
+
+  # -----------------------------------------------------------------
+  # ALL OTHER JOBS (build-local, build-global, host, announce)
+  # -----------------------------------------------------------------
+  #
+  # The rest of your jobs (`build-local-artifacts`, `build-global-artifacts`,
+  # `host`, and `announce`) are perfectly fine.
+  #
+  # Their `needs: plan` dependency is correct and does not need to change.
+  # They will now run correctly because `plan` will no longer be skipped.
+  #
 
   # Step 3: Build platform-specific artifacts
   build-local-artifacts:
