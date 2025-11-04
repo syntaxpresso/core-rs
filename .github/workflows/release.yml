@@ -1,304 +1,84 @@
 name: Release
-
 on:
-  pull_request:
+  push:
     branches:
-      - main
-    types:
-      - closed
+      - main # Triggers when you merge a PR into main
 
 permissions:
-  contents: write
+  contents: write # Allows creating commits, tags, and releases
 
 jobs:
-  # Step 1: Create the tag (only if PR was merged and came from develop)
-  create-tag:
-    name: Create Release Tag
+  # -----------------------------------------------------------------
+  # JOB 1: Bump the version, commit, tag, and push
+  # -----------------------------------------------------------------
+  bump-and-tag:
     runs-on: ubuntu-latest
-    # Only run if PR was merged (not just closed) and source branch was develop
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     outputs:
-      tag_name: ${{ steps.create_tag.outputs.tag_name || steps.check_tag.outputs.tag_name }}
-      tag_created: ${{ steps.create_tag.outputs.tag_created || 'false' }}
+      new_tag: ${{ steps.bump.outputs.new_tag }} # Output the new tag for the next job
+
     steps:
-      - name: Checkout code
+      - name: Check out code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: main # Checkout main branch after merge
+          token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing to main
 
-      - name: Get version from Cargo.toml
-        id: get_version
+      - name: Configure Git
         run: |
-          VERSION=$(sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' Cargo.toml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $VERSION"
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Check if tag exists
-        id: check_tag
+      - name: Bump version and create tag
+        id: bump
         run: |
-          TAG_NAME="v${{ steps.get_version.outputs.version }}"
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Tag $TAG_NAME already exists. Skipping tag creation."
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          else
-            echo "Tag $TAG_NAME does not exist. Proceeding with tag creation."
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          fi
+          # Get current version from Cargo.toml
+          VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
 
-      - name: Create and Push Tag
-        id: create_tag
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          TAG_NAME="${{ steps.check_tag.outputs.tag_name }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME"
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "tag_created=true" >> $GITHUB_OUTPUT
-          echo "Tag $TAG_NAME created and pushed successfully"
+          # Increment the patch version (e.g., 0.0.2 -> 0.0.3)
+          OLD_IFS=$IFS; IFS='.'; read -r -a VERSION_PARTS <<< "$VERSION"; IFS=$OLD_IFS
+          VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
 
-  # Rest of the jobs remain the same...
-  plan:
-    needs: create-tag
-    if: needs.create-tag.outputs.tag_created == 'true'
-    runs-on: "ubuntu-22.04"
-    outputs:
-      val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ needs.create-tag.outputs.tag_name }}
-      tag-flag: ${{ format('--tag={0}', needs.create-tag.outputs.tag_name) }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "Bumping version $VERSION to $NEW_VERSION"
+
+          # Update Cargo.toml
+          sed -i "s/version = \"$VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
+
+          # Commit the version bump
+          git add Cargo.toml
+          git commit -m "Bump version to $NEW_VERSION"
+
+          # Create the new tag
+          NEW_TAG="v$NEW_VERSION"
+          git tag $NEW_TAG
+
+          # Set the output for the next job
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Push commit and tag
+        run: git push origin main --follow-tags
+
+  # -----------------------------------------------------------------
+  # JOB 2: Build and release using cargo-dist
+  # -----------------------------------------------------------------
+  build-release:
+    needs: bump-and-tag # Wait for the bump-and-tag job to finish
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out new tag
+        uses: actions/checkout@v4
         with:
-          ref: ${{ needs.create-tag.outputs.tag_name }}
-          persist-credentials: false
-          submodules: recursive
+          # Check out the specific tag we just created
+          ref: ${{ needs.bump-and-tag.outputs.new_tag }}
 
-      - name: Install dist
-        shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.2/cargo-dist-installer.sh | sh"
-
-      - name: Cache dist
-        uses: actions/upload-artifact@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
         with:
-          name: cargo-dist-cache
-          path: ~/.cargo/bin/dist
+          toolchain: stable
 
-      - id: plan
-        run: |
-          dist host --steps=create --tag=${{ needs.create-tag.outputs.tag_name }} --output-format=json > plan-dist-manifest.json
-          echo "dist ran successfully"
-          cat plan-dist-manifest.json
-          echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
-
-      - name: "Upload dist-manifest.json"
-        uses: actions/upload-artifact@v4
+      - name: Run cargo-dist
+        uses: axodotdev/cargo-dist@v0.11.1 # Using a recent stable version
         with:
-          name: artifacts-plan-dist-manifest
-          path: plan-dist-manifest.json
-
-  # Step 3: Build platform-specific artifacts
-  build-local-artifacts:
-    name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
-    needs:
-      - plan
-    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
-    runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.container && matrix.container.image || null }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
-    steps:
-      - name: enable windows longpaths
-        run: |
-          git config --global core.longpaths true
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.plan.outputs.tag }}
-          persist-credentials: false
-          submodules: recursive
-
-      - name: Install Rust non-interactively if not already installed
-        if: ${{ matrix.container }}
-        run: |
-          if ! command -v cargo > /dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Install dist
-        run: ${{ matrix.install_dist.run }}
-
-      - name: Fetch local artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
-
-      - name: Install dependencies
-        run: |
-          ${{ matrix.packages_install }}
-
-      - name: Build artifacts
-        run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
-          echo "dist ran successfully"
-
-      - id: cargo-dist
-        name: Post-build
-        shell: bash
-        run: |
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-
-      - name: "Upload artifacts"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-build-local-${{ join(matrix.targets, '_') }}
-          path: |
-            ${{ steps.cargo-dist.outputs.paths }}
-            ${{ env.BUILD_MANIFEST_NAME }}
-
-  # Step 4: Build global artifacts
-  build-global-artifacts:
-    needs:
-      - plan
-      - build-local-artifacts
-    runs-on: "ubuntu-22.04"
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.plan.outputs.tag }}
-          persist-credentials: false
-          submodules: recursive
-
-      - name: Install cached dist
-        uses: actions/download-artifact@v4
-        with:
-          name: cargo-dist-cache
-          path: ~/.cargo/bin/
-
-      - run: chmod +x ~/.cargo/bin/dist
-
-      - name: Fetch local artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
-
-      - id: cargo-dist
-        shell: bash
-        run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
-          echo "dist ran successfully"
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          jq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-
-      - name: "Upload artifacts"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-build-global
-          path: |
-            ${{ steps.cargo-dist.outputs.paths }}
-            ${{ env.BUILD_MANIFEST_NAME }}
-
-  # Step 5: Create the GitHub Release
-  host:
-    needs:
-      - plan
-      - build-local-artifacts
-      - build-global-artifacts
-    if: ${{ always() && needs.plan.result == 'success' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: "ubuntu-22.04"
-    outputs:
-      val: ${{ steps.host.outputs.manifest }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.plan.outputs.tag }}
-          persist-credentials: false
-          submodules: recursive
-
-      - name: Install cached dist
-        uses: actions/download-artifact@v4
-        with:
-          name: cargo-dist-cache
-          path: ~/.cargo/bin/
-
-      - run: chmod +x ~/.cargo/bin/dist
-
-      - name: Fetch artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
-
-      - id: host
-        shell: bash
-        run: |
-          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
-          echo "artifacts uploaded and released successfully"
-          cat dist-manifest.json
-          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
-
-      - name: "Upload dist-manifest.json"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-dist-manifest
-          path: dist-manifest.json
-
-      - name: "Download GitHub Artifacts"
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-*
-          path: artifacts
-          merge-multiple: true
-
-      - name: Cleanup
-        run: |
-          rm -f artifacts/*-dist-manifest.json
-
-      - name: Create GitHub Release
-        env:
-          PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
-          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.host.outputs.manifest).announcement_title }}"
-          ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
-          RELEASE_COMMIT: "${{ github.sha }}"
-        run: |
-          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
-
-  announce:
-    needs:
-      - plan
-      - host
-    if: ${{ always() && needs.host.result == 'success' }}
-    runs-on: "ubuntu-22.04"
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          submodules: recursive
+          # cargo-dist will see it's on a tag and automatically
+          # build, create a draft release, and upload assets.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
