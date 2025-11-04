@@ -88,6 +88,12 @@ pub enum Commands {
 
     #[arg(long, value_parser = validate_java_class_name, required = true)]
     file_name: String,
+
+    #[arg(long, required = false)]
+    superclass_type: Option<String>,
+
+    #[arg(long, required = false)]
+    superclass_package_name: Option<String>,
   },
   CreateJPARepository {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
@@ -307,8 +313,20 @@ impl Commands {
         );
         response.to_json_pretty().map_err(|e| e.into())
       }
-      Commands::CreateJPAEntity { cwd, package_name, file_name } => {
-        let response = create_jpa_entity_command::execute(cwd.as_path(), package_name, file_name);
+      Commands::CreateJPAEntity {
+        cwd,
+        package_name,
+        file_name,
+        superclass_type,
+        superclass_package_name,
+      } => {
+        let response = create_jpa_entity_command::execute(
+          cwd.as_path(),
+          package_name,
+          file_name,
+          superclass_type.as_deref(),
+          superclass_package_name.as_deref(),
+        );
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::CreateJPARepository { cwd, entity_file_path, b64_superclass_source } => {
