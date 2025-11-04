@@ -1,6 +1,6 @@
 [package]
 name = "syntaxpresso-core"
-version = "0.0.42"
+version = "0.0.43"
 edition = "2024"
 repository = "https://github.com/syntaxpresso/core"
 
