@@ -82,9 +82,40 @@ jobs:
           echo "tag_created=true" >> $GITHUB_OUTPUT
       - name: Push commit and tag
         run: git push origin main --follow-tags
-  build-binaries:
+  sync-develop:
+    name: Sync develop branch with main
+    runs-on: ubuntu-latest
     if: needs.update-version-and-create-tag.outputs.tag_created == 'true'
     needs: update-version-and-create-tag
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.SYNTAXPRESSO_CI }}
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config --global user.name 'Syntaxpresso[bot]'
+          git config --global user.email 'bot@syntaxpresso.github.io'
+      - name: Merge main into develop
+        run: |
+          echo "Fetching latest changes..."
+          git fetch origin main develop
+          
+          echo "Checking out develop branch..."
+          git checkout develop
+          
+          echo "Merging main into develop..."
+          git merge origin/main --no-ff -m "chore: sync develop with main after version ${{ needs.update-version-and-create-tag.outputs.new_version }} release"
+          
+          echo "Pushing changes to develop..."
+          git push origin develop
+          
+          echo "✓ Successfully synced develop with main"
+  build-binaries:
+    if: needs.update-version-and-create-tag.outputs.tag_created == 'true'
+    needs: [update-version-and-create-tag, sync-develop]
     strategy:
       matrix:
         include:
