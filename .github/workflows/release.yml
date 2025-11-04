@@ -37,44 +37,72 @@ jobs:
           echo "Current version from Cargo.toml: $CURRENT_VERSION"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           echo "Parsed version: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
-          # Determine version increment based on labels
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]]; then
-            echo "Breaking change label found. Incrementing MAJOR version."
-            MAJOR=$((MAJOR + 1))
-            MINOR=0
-            PATCH=0
-          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
-            echo "Enhancement label found. Incrementing MINOR version."
-            MINOR=$((MINOR + 1))
-            PATCH=0
+          CURRENT_TAG="v$CURRENT_VERSION"
+          SHOULD_UPDATE_VERSION=true
+          # Check if current version has an orphaned tag
+          if git rev-parse "$CURRENT_TAG" >/dev/null 2>&1; then
+            echo "⚠️  Tag $CURRENT_TAG exists for current version"
+            # Check if it has a release
+            if gh release view "$CURRENT_TAG" >/dev/null 2>&1; then
+              echo "✓ Release already exists for $CURRENT_TAG"
+              echo "This workflow is idempotent - safe to rerun."
+              echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+              echo "new_tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
+              echo "tag_created=false" >> $GITHUB_OUTPUT
+              exit 0
+            else
+              echo "⚠️  Tag $CURRENT_TAG is orphaned (no release exists)"
+              # Determine action based on label type
+              if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]] || \
+                 [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
+                echo "Label indicates major/minor bump. Skipping orphaned version."
+                echo "Deleting orphaned tag $CURRENT_TAG..."
+                git push --delete origin "$CURRENT_TAG" 2>/dev/null || echo "Remote tag deletion skipped"
+                git tag -d "$CURRENT_TAG" 2>/dev/null || echo "Local tag deletion skipped"
+                # Will calculate new version below
+                SHOULD_UPDATE_VERSION=true
+              else
+                echo "Label indicates patch bump. Retrying orphaned version $CURRENT_VERSION"
+                echo "Deleting orphaned tag $CURRENT_TAG to retry..."
+                git push --delete origin "$CURRENT_TAG" 2>/dev/null || echo "Remote tag deletion skipped"
+                git tag -d "$CURRENT_TAG" 2>/dev/null || echo "Local tag deletion skipped"
+                # Retry same version (no Cargo.toml update needed)
+                NEW_VERSION="$CURRENT_VERSION"
+                SHOULD_UPDATE_VERSION=false
+              fi
+            fi
+          fi
+          # Calculate new version if needed
+          if [ "$SHOULD_UPDATE_VERSION" = true ]; then
+            # Determine version increment based on labels
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]]; then
+              echo "Breaking change label found. Incrementing MAJOR version."
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+            elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
+              echo "Enhancement label found. Incrementing MINOR version."
+              MINOR=$((MINOR + 1))
+              PATCH=0
+            else
+              # This 'else' block handles 'fix' label or no label at all
+              echo "Fix/default label logic. Incrementing PATCH version."
+              PATCH=$((PATCH + 1))
+            fi
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            echo "New version: $NEW_VERSION"
+            # Update Cargo.toml
+            sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
+            # Update Cargo.lock to reflect the new version
+            cargo update --workspace --offline || cargo update --workspace
+            # Commit both Cargo.toml and Cargo.lock
+            git add Cargo.toml Cargo.lock
+            git commit -m "Update version to $NEW_VERSION"
           else
-            # This 'else' block handles 'fix' label or no label at all
-            echo "Fix/default label logic. Incrementing PATCH version."
-            PATCH=$((PATCH + 1))
+            echo "Using existing version: $NEW_VERSION (no Cargo.toml update needed)"
           fi
-          # Create new version string
-          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          echo "New version: $NEW_VERSION"
-
-          # Check if the tag already exists (idempotency check)
-          NEW_TAG="v$NEW_VERSION"
-          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
-            echo "⚠️  Tag $NEW_TAG already exists. Skipping version bump."
-            echo "This workflow is idempotent - safe to rerun."
-            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-            echo "tag_created=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          echo "✓ Tag $NEW_TAG does not exist. Proceeding with version bump."
-          # Update Cargo.toml (using the original $CURRENT_VERSION to find and replace)
-          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
-          # Update Cargo.lock to reflect the new version
-          cargo update --workspace --offline || cargo update --workspace
-          # Commit both Cargo.toml and Cargo.lock
-          git add Cargo.toml Cargo.lock
-          git commit -m "Update version to $NEW_VERSION"
           # Create an ANNOTATED tag so --follow-tags will push it
+          NEW_TAG="v$NEW_VERSION"
           git tag -a $NEW_TAG -m "Release $NEW_TAG"
           # Set the output for the next job
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
