@@ -37,14 +37,11 @@ jobs:
           echo "Current version from Cargo.toml: $CURRENT_VERSION"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           echo "Parsed version: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
-          
           CURRENT_TAG="v$CURRENT_VERSION"
           SHOULD_UPDATE_VERSION=true
-          
           # Check if current version has an orphaned tag
           if git rev-parse "$CURRENT_TAG" >/dev/null 2>&1; then
             echo "⚠️  Tag $CURRENT_TAG exists for current version"
-            
             # Check if it has a release
             if gh release view "$CURRENT_TAG" >/dev/null 2>&1; then
               echo "✓ Release already exists for $CURRENT_TAG"
@@ -55,7 +52,6 @@ jobs:
               exit 0
             else
               echo "⚠️  Tag $CURRENT_TAG is orphaned (no release exists)"
-              
               # Determine action based on label type
               if [[ "${{ contains(github.event.pull_request.labels.*.name, 'break') }}" == "true" ]] || \
                  [[ "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
@@ -63,7 +59,6 @@ jobs:
                 echo "Deleting orphaned tag $CURRENT_TAG..."
                 git push --delete origin "$CURRENT_TAG" 2>/dev/null || echo "Remote tag deletion skipped"
                 git tag -d "$CURRENT_TAG" 2>/dev/null || echo "Local tag deletion skipped"
-                
                 # Will calculate new version below
                 SHOULD_UPDATE_VERSION=true
               else
@@ -71,14 +66,12 @@ jobs:
                 echo "Deleting orphaned tag $CURRENT_TAG to retry..."
                 git push --delete origin "$CURRENT_TAG" 2>/dev/null || echo "Remote tag deletion skipped"
                 git tag -d "$CURRENT_TAG" 2>/dev/null || echo "Local tag deletion skipped"
-                
                 # Retry same version (no Cargo.toml update needed)
                 NEW_VERSION="$CURRENT_VERSION"
                 SHOULD_UPDATE_VERSION=false
               fi
             fi
           fi
-          
           # Calculate new version if needed
           if [ "$SHOULD_UPDATE_VERSION" = true ]; then
             # Determine version increment based on labels
@@ -96,10 +89,8 @@ jobs:
               echo "Fix/default label logic. Incrementing PATCH version."
               PATCH=$((PATCH + 1))
             fi
-            
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
             echo "New version: $NEW_VERSION"
-            
             # Update Cargo.toml
             sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
             # Update Cargo.lock to reflect the new version
@@ -110,11 +101,9 @@ jobs:
           else
             echo "Using existing version: $NEW_VERSION (no Cargo.toml update needed)"
           fi
-          
           # Create an ANNOTATED tag so --follow-tags will push it
           NEW_TAG="v$NEW_VERSION"
           git tag -a $NEW_TAG -m "Release $NEW_TAG"
-          
           # Set the output for the next job
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
