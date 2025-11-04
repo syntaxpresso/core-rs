@@ -13,6 +13,7 @@ permissions:
 jobs:
   bump-and-tag:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'Bump version to')"
     outputs:
       new_tag: ${{ steps.bump.outputs.new_tag }} # Output the new tag for the next job
 
@@ -24,8 +25,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global user.name 'Syntaxpresso[bot]'
+          git config --global user.email 'bot@syntaxpresso.github.io'
 
       - name: Bump version and create tag
         id: bump
