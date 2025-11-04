@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SYNTAXPRESSO_CI }}
           fetch-depth: 0 # Fetch all history to find the last tag correctly
       - name: Configure git
         run: |
