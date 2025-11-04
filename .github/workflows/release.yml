@@ -14,16 +14,15 @@ jobs:
   # -----------------------------------------------------------------
   bump-and-tag:
     runs-on: ubuntu-latest
-    # This check prevents the workflow from re-triggering itself.
     if: "!contains(github.event.head_commit.message, 'Bump version to')"
     outputs:
-      new_tag: ${{ steps.bump.outputs.new_tag }} # Output the new tag for the next job
+      new_tag: ${{ steps.bump.outputs.new_tag }}
 
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing to main
+          token: ${{ secrets.GH_PAT }} # This job uses PAT
 
       - name: Configure Git
         run: |
@@ -33,28 +32,16 @@ jobs:
       - name: Bump version and create tag
         id: bump
         run: |
-          # Get current version from Cargo.toml
           VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
-
-          # Increment the patch version (e.g., 0.0.2 -> 0.0.3)
           OLD_IFS=$IFS; IFS='.'; read -r -a VERSION_PARTS <<< "$VERSION"; IFS=$OLD_IFS
           VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
           NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
-
           echo "Bumping version $VERSION to $NEW_VERSION"
-
-          # Update Cargo.toml
           sed -i "s/version = \"$VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
-
-          # Commit the version bump
           git add Cargo.toml
           git commit -m "Bump version to $NEW_VERSION"
-
-          # Create the new tag
           NEW_TAG="v$NEW_VERSION"
           git tag $NEW_TAG
-
-          # Set the output for the next job
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
       - name: Push commit and tag
@@ -64,19 +51,19 @@ jobs:
   # JOB 2: Plan the cargo-dist release
   # -----------------------------------------------------------------
   plan:
-    needs: bump-and-tag # <-- CHANGED: Now depends on bump-and-tag
-    # if: needs.create-tag.outputs.tag_created == 'true' # <-- REMOVED: No longer needed
+    needs: bump-and-tag
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ needs.bump-and-tag.outputs.new_tag }} # <-- CHANGED
-      tag-flag: ${{ format('--tag={0}', needs.bump-and-tag.outputs.new_tag) }} # <-- CHANGED
+      tag: ${{ needs.bump-and-tag.outputs.new_tag }}
+      tag-flag: ${{ format('--tag={0}', needs.bump-and-tag.outputs.new_tag) }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.bump-and-tag.outputs.new_tag }} # <-- CHANGED
+          token: ${{ secrets.GH_PAT }} # <-- ⬇️⬇️ ADD THIS ⬇️⬇️
+          ref: ${{ needs.bump-and-tag.outputs.new_tag }}
           persist-credentials: false
           submodules: recursive
 
@@ -92,7 +79,7 @@ jobs:
 
       - id: plan
         run: |
-          dist host --steps=create --tag=${{ needs.bump-and-tag.outputs.new_tag }} --output-format=json > plan-dist-manifest.json # <-- CHANGED
+          dist host --steps=create --tag=${{ needs.bump-and-tag.outputs.new_tag }} --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
@@ -103,22 +90,10 @@ jobs:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
 
-  # -----------------------------------------------------------------
-  # ALL OTHER JOBS (build-local, build-global, host, announce)
-  # -----------------------------------------------------------------
-  #
-  # The rest of your jobs (`build-local-artifacts`, `build-global-artifacts`,
-  # `host`, and `announce`) are perfectly fine.
-  #
-  # Their `needs: plan` dependency is correct and does not need to change.
-  # They will now run correctly because `plan` will no longer be skipped.
-  #
-
   # Step 3: Build platform-specific artifacts
   build-local-artifacts:
     name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
-    needs:
-      - plan
+    needs: [plan]
     if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null }}
     strategy:
       fail-fast: false
@@ -130,15 +105,16 @@ jobs:
       BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
     steps:
       - name: enable windows longpaths
-        run: |
-          git config --global core.longpaths true
+        run: git config --global core.longpaths true
 
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_PAT }} # <-- ⬇️⬇️ ADD THIS ⬇️⬇️
           ref: ${{ needs.plan.outputs.tag }}
           persist-credentials: false
           submodules: recursive
 
+      # ... (rest of the job)
       - name: Install Rust non-interactively if not already installed
         if: ${{ matrix.container }}
         run: |
@@ -146,26 +122,21 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
-
       - name: Fetch local artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: artifacts-*
           path: target/distrib/
           merge-multiple: true
-
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
-
       - name: Build artifacts
         run: |
           dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
           echo "dist ran successfully"
-
       - id: cargo-dist
         name: Post-build
         shell: bash
@@ -174,7 +145,6 @@ jobs:
           dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-
       - name: "Upload artifacts"
         uses: actions/upload-artifact@v4
         with:
@@ -185,9 +155,7 @@ jobs:
 
   # Step 4: Build global artifacts
   build-global-artifacts:
-    needs:
-      - plan
-      - build-local-artifacts
+    needs: [plan, build-local-artifacts]
     runs-on: "ubuntu-22.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -195,25 +163,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_PAT }} # <-- ⬇️⬇️ ADD THIS ⬇️⬇️
           ref: ${{ needs.plan.outputs.tag }}
           persist-credentials: false
           submodules: recursive
 
+      # ... (rest of the job)
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/
-
       - run: chmod +x ~/.cargo/bin/dist
-
       - name: Fetch local artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: artifacts-*
           path: target/distrib/
           merge-multiple: true
-
       - id: cargo-dist
         shell: bash
         run: |
@@ -223,7 +190,6 @@ jobs:
           jq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-
       - name: "Upload artifacts"
         uses: actions/upload-artifact@v4
         with:
@@ -234,10 +200,7 @@ jobs:
 
   # Step 5: Create the GitHub Release
   host:
-    needs:
-      - plan
-      - build-local-artifacts
-      - build-global-artifacts
+    needs: [plan, build-local-artifacts, build-global-artifacts]
     if: ${{ always() && needs.plan.result == 'success' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -247,25 +210,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_PAT }} # <-- ⬇️⬇️ ADD THIS ⬇️⬇️
           ref: ${{ needs.plan.outputs.tag }}
           persist-credentials: false
           submodules: recursive
 
+      # ... (rest of the job)
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/
-
       - run: chmod +x ~/.cargo/bin/dist
-
       - name: Fetch artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: artifacts-*
           path: target/distrib/
           merge-multiple: true
-
       - id: host
         shell: bash
         run: |
@@ -273,24 +235,20 @@ jobs:
           echo "artifacts uploaded and released successfully"
           cat dist-manifest.json
           echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
-
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-dist-manifest
           path: dist-manifest.json
-
       - name: "Download GitHub Artifacts"
         uses: actions/download-artifact@v4
         with:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
-
       - name: Cleanup
         run: |
           rm -f artifacts/*-dist-manifest.json
-
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
@@ -302,9 +260,7 @@ jobs:
           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
   announce:
-    needs:
-      - plan
-      - host
+    needs: [plan, host]
     if: ${{ always() && needs.host.result == 'success' }}
     runs-on: "ubuntu-22.04"
     env:
@@ -312,5 +268,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_PAT }} # <-- ⬇️⬇️ ADD THIS ⬇️⬇️
           persist-credentials: false
           submodules: recursive
