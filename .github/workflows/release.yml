@@ -32,6 +32,8 @@ jobs:
           git config --global user.email 'bot@syntaxpresso.github.io'
       - name: Update version and create tag
         id: bump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CURRENT_VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
           echo "Current version from Cargo.toml: $CURRENT_VERSION"
