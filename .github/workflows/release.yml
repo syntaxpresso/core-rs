@@ -1,128 +1,81 @@
-# Name for the workflow
 name: Release
 
-# Controls when the workflow will run
 on:
   pull_request:
-    types: [closed]
     branches:
-      - "main"
+      - main
+    types:
+      - closed
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: write
+
 jobs:
-  # This job handles versioning and tagging
-  release:
-    # The 'if' condition ensures this job only runs for merged pull requests from develop to main
-    # and excludes documentation-only PRs
-    if: >
-      github.event.pull_request.merged == true && 
-      github.event.pull_request.head.ref == 'develop' && 
-      !contains(github.event.pull_request.labels.*.name, 'documentation')
-
+  # This job replaces both 'bump-and-tag' and 'create-tag'
+  bump-and-tag-release:
+    name: Bump Version and Create Release Tag
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
-    # Outputs that can be used by other jobs
+    # Combined 'if' conditions
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'develop' &&
+      !contains(github.event.pull_request.head_commit.message, 'Bump version to')
+
     outputs:
-      version: ${{ steps.create_version.outputs.VERSION }}
-      run_build: ${{ steps.create_version.outputs.RUN_BUILD }} # Output to control downstream jobs
+      version: ${{ steps.bump.outputs.new_version }}
+      tag_name: ${{ steps.bump.outputs.new_tag }}
+      tag_created: ${{ steps.bump.outputs.tag_created }}
 
     steps:
-      - name: Checkout code
+      - name: Check out code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.ref }}
-          # Use a PAT to allow pushing the version bump
-          token: ${{ secrets.GH_PAT }}
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+          ref: main # Check out main, which now contains the merged PR
+          token: ${{ secrets.GH_PAT }} # Use the PAT to allow pushing back to main
 
       - name: Configure Git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Get current version and calculate next
-        id: create_version
+      - name: Bump version and create tag
+        id: bump
         run: |
-          # Get the latest tag directly from Git
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag from Git: '$LATEST_TAG'"
+          # Get current version from Cargo.toml
+          VERSION=$(grep '^version' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version: $VERSION"
 
-          # Remove 'v' prefix and validate
-          CURRENT_VERSION=${LATEST_TAG#v}
-          echo "Cleaned current version: '$CURRENT_VERSION'"
+          # Increment the patch version (e.g., 0.0.2 -> 0.0.3)
+          OLD_IFS=$IFS; IFS='.'; read -r -a VERSION_PARTS <<< "$VERSION"; IFS=$OLD_IFS
+          VERSION_PARTS[2]=$((VERSION_PARTS[2] + 1))
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+          echo "New version: $NEW_VERSION"
 
-          if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Could not parse version from tag. Got: '$CURRENT_VERSION'"
-            echo "Setting fallback version to 0.0.0"
-            CURRENT_VERSION="0.0.0"
-          fi
+          # Update Cargo.toml
+          sed -i "s/version = \"$VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
 
-          echo "Current version: $CURRENT_VERSION"
+          # Commit the version bump
+          git add Cargo.toml
+          git commit -m "Bump version to $NEW_VERSION"
 
-          # Parse version components
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          # Create an ANNOTATED tag so --follow-tags will push it
+          NEW_TAG="v$NEW_VERSION"
+          git tag -a $NEW_TAG -m "Release $NEW_TAG"
 
-          if [[ -z "$MAJOR" || -z "$MINOR" || -z "$PATCH" ]]; then
-            echo "Error: Failed to parse version components from '$CURRENT_VERSION'"
-            exit 1
-          fi
+          # Set the output for the next job
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "tag_created=true" >> $GITHUB_OUTPUT
 
-          echo "Parsed components - MAJOR: $MAJOR, MINOR: $MINOR, PATCH: $PATCH"
-
-          # Determine version increment based on labels
-          RUN_BUILD="false"
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'feature') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'enhancement') }}" == "true" ]]; then
-            echo "Incrementing minor version for feature/enhancement"
-            MINOR=$((MINOR + 1))
-            PATCH=0
-            RUN_BUILD="true"
-          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bug') }}" == "true" || "${{ contains(github.event.pull_request.labels.*.name, 'patch') }}" == "true" ]]; then
-            echo "Incrementing patch version for bug/patch"
-            PATCH=$((PATCH + 1))
-            RUN_BUILD="true"
-          else
-            echo "No versioning label found ('feature', 'enhancement', 'bug', 'patch'). Skipping release."
-            RUN_BUILD="false"
-          fi
-
-          # Only proceed if a version bump was triggered
-          if [[ "$RUN_BUILD" == "true" ]]; then
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            echo "New version: $NEW_VERSION"
-
-            # Update Cargo.toml version
-            sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
-            git add Cargo.toml
-            git commit -m "chore: bump version to $NEW_VERSION" || echo "No changes to commit"
-
-            # Set outputs
-            echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "RUN_BUILD=true" >> $GITHUB_OUTPUT
-            echo "Calculated version: $NEW_VERSION"
-          else
-            # Set output to skip downstream jobs
-            echo "RUN_BUILD=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Push version bump to main
-        if: steps.create_version.outputs.RUN_BUILD == 'true'
-        run: |
-          git push origin ${{ github.event.pull_request.base.ref }}
+      - name: Push commit and tag
+        run: git push origin main --follow-tags
 
   # This job builds the native binaries for multiple platforms
   build-native:
-    # Only run if the release job determined a build is needed
-    if: needs.release.outputs.run_build == 'true'
-    needs: release
+    # Only run if the first job created a tag
+    if: needs.bump-and-tag-release.outputs.tag_created == 'true'
+    needs: bump-and-tag-release
     strategy:
       matrix:
         include:
@@ -155,8 +108,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Check out the main branch, which now has the version bump
-          ref: ${{ github.event.pull_request.base.ref }}
+          # This is critical: check out the NEW tag from the previous job
+          ref: ${{ needs.bump-and-tag-release.outputs.tag_name }}
+          # This prevents the race condition where the tag isn't found
+          fetch-depth: 0
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -216,19 +171,14 @@ jobs:
 
   # This job creates the GitHub Release and uploads the binaries
   create-release:
-    # Only run if the release job determined a build is needed
-    if: needs.release.outputs.run_build == 'true'
-    needs: [release, build-native]
+    # Only run if the first job created a tag
+    if: needs.bump-and-tag-release.outputs.tag_created == 'true'
+    needs: [bump-and-tag-release, build-native]
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -259,46 +209,14 @@ jobs:
           echo "Final release files with permissions:"
           ls -la release-files/
 
-      - name: Create tag and GitHub Release with tag/release checking
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Get the tag name from the first job
+          TAG_NAME: ${{ needs.bump-and-tag-release.outputs.tag_name }}
         run: |
-          VERSION="${{ needs.release.outputs.version }}"
-          TAG_NAME="v${VERSION}"
-
-          # Fetch all tags to ensure we have the latest
-          git fetch --tags
-
-          # Check if tag already exists
-          if git tag -l | grep -q "^${TAG_NAME}$"; then
-            echo "Tag ${TAG_NAME} already exists"
-            
-            # Check if GitHub release exists for this tag
-            if gh release view ${TAG_NAME} >/dev/null 2>&1; then
-              echo "GitHub release for ${TAG_NAME} already exists. Skipping release creation."
-              exit 0
-            else
-              echo "Tag exists but no GitHub release found. Creating release for existing tag..."
-              gh release create ${TAG_NAME} \
-                --title "Release ${TAG_NAME}" \
-                --generate-notes \
-                release-files/*
-            fi
-          else
-            echo "Tag ${TAG_NAME} doesn't exist. Creating tag and release..."
-            
-            # Configure Git
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            
-            # Create and push tag
-            # Create an annotated tag for better release metadata
-            git tag -a ${TAG_NAME} -m "Release ${TAG_NAME}"
-            git push origin ${TAG_NAME}
-            
-            # Create GitHub release
-            gh release create ${TAG_NAME} \
-              --title "Release ${TAG_NAME}" \
-              --generate-notes \
-              release-files/*
-          fi
+          echo "Creating release for ${TAG_NAME}"
+          gh release create ${TAG_NAME} \
+            --title "Release ${TAG_NAME}" \
+            --generate-notes \
+            release-files/*
