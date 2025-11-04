@@ -2,7 +2,10 @@ use std::path::Path;
 
 use crate::commands::services::create_java_file_service;
 use crate::common::services::annotation_service;
-use crate::common::services::import_declaration_service;
+use crate::common::services::class_declaration_service::{
+  get_class_declaration_name_node, get_public_class_node,
+};
+use crate::common::services::import_declaration_service::{self, add_import};
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_types::AnnotationInsertionPosition;
 use crate::common::types::import_types::ImportInsertionPosition;
@@ -103,12 +106,42 @@ fn add_table_name_argument(ts_file: &mut TSFile, class_name: &str) -> Result<(),
   }
 }
 
+fn add_superclass_heritage(
+  ts_file: &mut TSFile,
+  superclass_type_opt: Option<&str>,
+  superclass_package_name_opt: Option<&str>,
+) -> Result<(), String> {
+  if superclass_type_opt.is_some() && superclass_package_name_opt.is_some() {
+    let superclass_type = superclass_type_opt.ok_or("Superclass type not provided".to_string())?;
+    let superclass_package_name =
+      superclass_package_name_opt.ok_or("Superclass package name not provided".to_string())?;
+    let class_declaration_node = get_public_class_node(ts_file)
+      .ok_or("Unable to get public class declaration from JPA Entity".to_string())?;
+    let class_name_node = get_class_declaration_name_node(ts_file, class_declaration_node)
+      .ok_or("Unable to get public class name node from JPA Entity".to_string())?;
+    ts_file.insert_text(class_name_node.end_byte(), &format!(" extends {}", superclass_type));
+    add_import(
+      ts_file,
+      &ImportInsertionPosition::AfterLastImport,
+      superclass_package_name,
+      superclass_type,
+    );
+  }
+  Ok(())
+}
+
 fn save_ts_file(ts_file: &mut TSFile, file_path: &str, base_path: &Path) -> Result<(), String> {
   let save_path = std::path::Path::new(file_path);
   ts_file.save_as(save_path, base_path).map_err(|e| format!("Failed to save file: {}", e))
 }
 
-pub fn run(cwd: &Path, package_name: &str, file_name: &str) -> Result<FileResponse, String> {
+pub fn run(
+  cwd: &Path,
+  package_name: &str,
+  file_name: &str,
+  superclass_type: Option<&str>,
+  superclass_package_name: Option<&str>,
+) -> Result<FileResponse, String> {
   // Normalize the class name to PascalCase
   let normalized_class_name = case_util::to_pascal_case(file_name);
   // Step 1: Create the Java file and get the initial response
@@ -127,8 +160,10 @@ pub fn run(cwd: &Path, package_name: &str, file_name: &str) -> Result<FileRespon
   add_table_annotation(&mut ts_file, updated_class_position)?;
   // Step 8: Add table name argument with snake_case conversion
   add_table_name_argument(&mut ts_file, &normalized_class_name)?;
-  // Step 9: Save the updated TSFile to disk
+  // Step 9: Add superclass heritage
+  add_superclass_heritage(&mut ts_file, superclass_type, superclass_package_name)?;
+  // Step 10: Save the updated TSFile to disk
   save_ts_file(&mut ts_file, &file_response.file_path, cwd)?;
-  // Step 10: Build and return the final file response
+  // Step 11: Build and return the final file response
   build_file_response(&ts_file, package_name)
 }

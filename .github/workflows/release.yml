@@ -59,7 +59,7 @@ jobs:
           sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
           # Commit the version bump
           git add Cargo.toml
-          git commit -m "Bump version to $NEW_VERSION"
+          git commit -m "Update version to $NEW_VERSION"
           # Create an ANNOTATED tag so --follow-tags will push it
           NEW_TAG="v$NEW_VERSION"
           git tag -a $NEW_TAG -m "Release $NEW_TAG"
