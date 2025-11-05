@@ -111,6 +111,9 @@ fn add_superclass_heritage(
   superclass_type_opt: Option<&str>,
   superclass_package_name_opt: Option<&str>,
 ) -> Result<(), String> {
+  if superclass_type_opt.is_some() != superclass_package_name_opt.is_some() {
+    return Err("Both superclass type and it's package name are necessary".to_string());
+  }
   if superclass_type_opt.is_some() && superclass_package_name_opt.is_some() {
     let superclass_type = superclass_type_opt.ok_or("Superclass type not provided".to_string())?;
     let superclass_package_name =
