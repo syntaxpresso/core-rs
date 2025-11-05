@@ -4,30 +4,39 @@ use crate::{
   common::{
     ts_file::TSFile,
     types::{java_file_type::JavaFileType, java_source_directory_type::JavaSourceDirectoryType},
-    utils::path_security_util::PathSecurityValidator,
+    utils::{case_util, path_security_util::PathSecurityValidator},
   },
   responses::file_response::FileResponse,
 };
 
-fn generate_file_template(file_type: &JavaFileType, package_name: &str, file_name: &str) -> String {
+pub fn generate_file_template(
+  file_type: &JavaFileType,
+  package_name: &str,
+  file_name: &str,
+) -> String {
   file_type.get_source_content(package_name, file_name)
 }
 
-fn create_ts_file(file_template: &str) -> TSFile {
+pub fn create_ts_file(file_template: &str) -> TSFile {
   TSFile::from_source_code(file_template)
 }
 
-fn correct_java_file_name(file_name: &str) -> String {
+pub fn correct_java_file_name(file_name: &str) -> String {
   match std::path::Path::new(file_name).extension() {
     Some(ext) if ext == "java" => file_name.to_string(),
     _ => match std::path::Path::new(file_name).file_stem() {
-      Some(stem) => format!("{}.java", stem.to_string_lossy()),
+      Some(stem) => {
+        format!(
+          "{}.java",
+          case_util::auto_convert_case(&stem.to_string_lossy(), case_util::CaseType::Pascal)
+        )
+      }
       None => "Unknown.java".to_string(),
     },
   }
 }
 
-fn build_save_path(
+pub fn build_save_path(
   source_directory: &JavaSourceDirectoryType,
   cwd: &Path,
   package_name: &str,
