@@ -1,4 +1,12 @@
-#![allow(dead_code)]
+use clap::ValueEnum;
+
+#[derive(Debug, Clone, PartialEq, ValueEnum)]
+pub enum JavaBasicFieldTypeKind {
+  #[value(name = "all")]
+  All,
+  #[value(name = "id")]
+  Id,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldInsertionPosition {

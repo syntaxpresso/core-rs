@@ -26,12 +26,14 @@ Syntaxpresso Core is designed as a backend service for IDE plugins, offering com
 - **`get-all-jpa-mapped-superclasses`**: Find all JPA mapped superclasses
 - **`create-jpa-entity`**: Generate new JPA entity classes
 - **`get-jpa-entity-info`**: Extract detailed information from existing entities
+- **`get-all-packages`**: List all Java packages in the project
 
 #### Field Generation
 
 - **`create-jpa-entity-basic-field`**: Add basic fields with JPA annotations
 - **`create-jpa-entity-id-field`**: Create ID fields with generation strategies
 - **`create-jpa-entity-enum-field`**: Add enum fields with proper JPA mapping
+- **`get-java-basic-types`**: List all supported Java basic field types (optionally filter for Id types)
 
 #### Relationship Management
 
@@ -48,6 +50,20 @@ Syntaxpresso Core is designed as a backend service for IDE plugins, offering com
 All commands follow a consistent pattern and return JSON responses:
 
 ```bash
+# List all Java packages in the project
+./syntaxpresso-core get-all-packages \
+  --cwd /path/to/project
+
+# List all supported Java basic field types
+./syntaxpresso-core get-java-basic-types \
+  --cwd /path/to/project \
+  --field-type-kind all
+
+# List only ID field types
+./syntaxpresso-core get-java-basic-types \
+  --cwd /path/to/project \
+  --field-type-kind id
+
 # Basic entity creation
 ./syntaxpresso-core create-jpa-entity \
   --cwd /path/to/project \
