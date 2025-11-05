@@ -9,6 +9,7 @@ pub mod create_jpa_repository_command;
 pub mod get_all_jpa_entities_command;
 pub mod get_all_jpa_mapped_superclasses;
 pub mod get_all_packages_command;
+pub mod get_id_field_types_command;
 pub mod get_jpa_entity_info_command;
 pub mod services;
 mod validators;
@@ -62,6 +63,10 @@ pub enum Commands {
 
     #[arg(long, default_value = "main")]
     source_directory: JavaSourceDirectoryType,
+  },
+  GetIdFieldTypes {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
   },
   CreateJavaFile {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
@@ -301,6 +306,10 @@ impl Commands {
       }
       Commands::GetAllPackages { cwd, source_directory } => {
         let response = get_all_packages_command::execute(cwd.as_path(), source_directory);
+        response.to_json_pretty().map_err(|e| e.into())
+      }
+      Commands::GetIdFieldTypes { cwd } => {
+        let response = get_id_field_types_command::execute(cwd.as_path());
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::CreateJavaFile { cwd, package_name, file_name, file_type, source_directory } => {
