@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use crate::commands::services::create_java_file_service;
+use crate::commands::services::create_java_file_service::{
+  build_save_path, correct_java_file_name, create_ts_file, generate_file_template,
+};
 use crate::common::services::annotation_service;
 use crate::common::services::class_declaration_service::{
   get_class_declaration_name_node, get_public_class_node,
@@ -48,18 +50,13 @@ fn build_file_response(ts_file: &TSFile, package_name: &str) -> Result<FileRespo
 }
 
 fn create_java_file_and_get_response(
-  cwd: &Path,
   package_name: &str,
   file_name: &str,
-) -> Result<FileResponse, String> {
+) -> Result<TSFile, String> {
   let file_type = JavaFileType::Class;
-  let source_directory = JavaSourceDirectoryType::Main;
-  create_java_file_service::run(cwd, package_name, file_name, &file_type, &source_directory)
-}
-
-fn load_ts_file(file_path: &str) -> Result<TSFile, String> {
-  TSFile::from_file(std::path::Path::new(file_path))
-    .map_err(|e| format!("Failed to create TSFile: {}", e))
+  let file_template = generate_file_template(&file_type, package_name, file_name);
+  let ts_file = create_ts_file(&file_template);
+  Ok(ts_file)
 }
 
 fn get_class_byte_position(ts_file: &TSFile) -> Result<usize, String> {
@@ -133,9 +130,16 @@ fn add_superclass_heritage(
   Ok(())
 }
 
-fn save_ts_file(ts_file: &mut TSFile, file_path: &str, base_path: &Path) -> Result<(), String> {
-  let save_path = std::path::Path::new(file_path);
-  ts_file.save_as(save_path, base_path).map_err(|e| format!("Failed to save file: {}", e))
+fn save_ts_file(
+  ts_file: &mut TSFile,
+  cwd: &Path,
+  file_name: &str,
+  package_name: &str,
+) -> Result<(), String> {
+  let corrected_file_name = correct_java_file_name(file_name);
+  let save_path =
+    build_save_path(&JavaSourceDirectoryType::Main, cwd, package_name, &corrected_file_name)?;
+  ts_file.save_as(&save_path, cwd).map_err(|e| format!("Failed to save file: {}", e))
 }
 
 pub fn run(
@@ -147,26 +151,24 @@ pub fn run(
 ) -> Result<FileResponse, String> {
   // Normalize the class name to PascalCase
   let normalized_class_name = case_util::to_pascal_case(file_name);
-  // Step 1: Create the Java file and get the initial response
-  let file_response = create_java_file_and_get_response(cwd, package_name, &normalized_class_name)?;
-  // Step 2: Load the file as a TSFile
-  let mut ts_file = load_ts_file(&file_response.file_path)?;
-  // Step 3: Add required imports for JPA annotations
+  // Step 1: Create the Java file
+  let mut ts_file = create_java_file_and_get_response(package_name, &normalized_class_name)?;
+  // Step 2: Add required imports for JPA annotations
   add_jpa_imports(&mut ts_file)?;
-  // Step 4: Get the public class node byte position after imports are added
+  // Step 3: Get the public class node byte position after imports are added
   let class_byte_position = get_class_byte_position(&ts_file)?;
-  // Step 5: Add @Entity annotation above the class declaration
+  // Step 4: Add @Entity annotation above the class declaration
   add_entity_annotation(&mut ts_file, class_byte_position)?;
-  // Step 6: Get the updated class node position after annotation insertion
+  // Step 5: Get the updated class node position after annotation insertion
   let updated_class_position = get_class_byte_position(&ts_file)?;
-  // Step 7: Add @Table annotation above the class declaration
+  // Step 6: Add @Table annotation above the class declaration
   add_table_annotation(&mut ts_file, updated_class_position)?;
-  // Step 8: Add table name argument with snake_case conversion
+  // Step 7: Add table name argument with snake_case conversion
   add_table_name_argument(&mut ts_file, &normalized_class_name)?;
-  // Step 9: Add superclass heritage
+  // Step 8: Add superclass heritage
   add_superclass_heritage(&mut ts_file, superclass_type, superclass_package_name)?;
-  // Step 10: Save the updated TSFile to disk
-  save_ts_file(&mut ts_file, &file_response.file_path, cwd)?;
-  // Step 11: Build and return the final file response
+  // Step 9: Save the updated TSFile to disk
+  save_ts_file(&mut ts_file, cwd, file_name, package_name)?;
+  // Step 10: Build and return the final file response
   build_file_response(&ts_file, package_name)
 }
