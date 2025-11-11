@@ -8,8 +8,8 @@ use crate::common::services::package_declaration_service::{
 };
 use crate::common::ts_file::TSFile;
 use crate::common::types::enum_field_config::EnumFieldConfig;
-use crate::common::types::field_types::FieldInsertionPosition;
 use crate::common::types::import_types::ImportInsertionPosition;
+use crate::common::types::java_basic_types::FieldInsertionPosition;
 use crate::common::types::java_enum_type::JavaEnumType;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::utils::case_util::{self, CaseType};

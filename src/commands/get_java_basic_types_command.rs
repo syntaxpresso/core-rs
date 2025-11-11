@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::{
   commands::services::get_java_basic_types_service::run,
-  common::types::basic_java_types::JavaBasicType,
+  common::types::java_basic_types::JavaBasicType,
   responses::{basic_java_type_response::JavaBasicTypeResponse, response::Response},
 };
 

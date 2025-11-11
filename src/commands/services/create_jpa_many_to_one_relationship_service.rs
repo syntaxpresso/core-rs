@@ -12,8 +12,8 @@ use crate::common::types::cascade_type::CascadeType;
 
 use crate::common::types::entity_side::EntitySide;
 use crate::common::types::fetch_type::FetchType;
-use crate::common::types::field_types::FieldInsertionPosition;
 use crate::common::types::import_types::ImportInsertionPosition;
+use crate::common::types::java_basic_types::FieldInsertionPosition;
 use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::types::many_to_one_field_config::ManyToOneFieldConfig;

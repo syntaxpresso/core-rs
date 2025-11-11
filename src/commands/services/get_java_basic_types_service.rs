@@ -1,5 +1,5 @@
 use crate::{
-  common::types::basic_java_types::JavaBasicType,
+  common::types::java_basic_types::JavaBasicType,
   responses::basic_java_type_response::JavaBasicTypeResponse,
 };
 

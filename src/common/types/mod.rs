@@ -1,7 +1,6 @@
 pub mod annotation_config;
 pub mod annotation_types;
 pub mod basic_field_config;
-pub mod basic_java_types;
 pub mod cascade_type;
 pub mod collection_type;
 pub mod entity_side;
@@ -9,6 +8,7 @@ pub mod enum_field_config;
 pub mod fetch_type;
 pub mod id_field_config;
 pub mod import_types;
+pub mod java_basic_types;
 pub mod java_enum_type;
 pub mod java_field_modifier;
 pub mod java_field_temporal;
