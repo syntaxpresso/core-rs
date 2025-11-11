@@ -10,6 +10,7 @@ pub mod get_all_jpa_entities_command;
 pub mod get_all_jpa_mapped_superclasses;
 pub mod get_all_packages_command;
 pub mod get_java_basic_types_command;
+pub mod get_java_files_command;
 pub mod get_jpa_entity_info_command;
 pub mod services;
 mod validators;
@@ -70,6 +71,13 @@ pub enum Commands {
 
     #[arg(long, default_value = "basic")]
     field_type_kind: JavaBasicFieldTypeKind,
+  },
+  GetJavaFiles {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    file_type: JavaFileType,
   },
   CreateJavaFile {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
@@ -313,6 +321,10 @@ impl Commands {
       }
       Commands::GetJavaBasicTypes { cwd, field_type_kind } => {
         let response = get_java_basic_types_command::execute(cwd.as_path(), field_type_kind);
+        response.to_json_pretty().map_err(|e| e.into())
+      }
+      Commands::GetJavaFiles { cwd, file_type } => {
+        let response = get_java_files_command::execute(cwd.as_path(), file_type);
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::CreateJavaFile { cwd, package_name, file_name, file_type, source_directory } => {
