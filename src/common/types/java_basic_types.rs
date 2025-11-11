@@ -4,10 +4,10 @@ use crate::responses::basic_java_type_response::JavaBasicTypeResponse;
 
 #[derive(Debug, Clone, PartialEq, ValueEnum)]
 pub enum JavaBasicType {
-  #[value(name = "all")]
-  All,
-  #[value(name = "id")]
-  Id,
+  #[value(name = "all-types")]
+  AllTypes,
+  #[value(name = "id-types")]
+  IdTypes,
   #[value(name = "types-with-length")]
   TypesWithLength,
   #[value(name = "types-with-time-zone-storage")]
