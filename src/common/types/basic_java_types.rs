@@ -21,7 +21,7 @@ pub enum JavaBasicType {
 }
 
 impl JavaBasicType {
-  pub fn get_all(&self) -> Vec<JavaBasicTypeResponse> {
+  pub fn get_all_types(&self) -> Vec<JavaBasicTypeResponse> {
     vec![
       JavaBasicTypeResponse {
         id: "java.lang.String".into(),
@@ -90,7 +90,7 @@ impl JavaBasicType {
       },
       JavaBasicTypeResponse {
         id: "java.sql.Date".into(),
-        name: "Date (sql)".into(),
+        name: "Date".into(),
         package_path: Some("java.sql".into()),
       },
       JavaBasicTypeResponse {
@@ -210,16 +210,6 @@ impl JavaBasicType {
       JavaBasicTypeResponse { id: "byte[]".into(), name: "byte[]".into(), package_path: None },
       JavaBasicTypeResponse { id: "char[]".into(), name: "char[]".into(), package_path: None },
       // --- Other Types ---
-      JavaBasicTypeResponse {
-        id: "org.geolatte.geom.Geometry".into(),
-        name: "Geometry (geolatte)".into(),
-        package_path: Some("org.geolatte.geom".into()),
-      },
-      JavaBasicTypeResponse {
-        id: "com.vividsolutions.jts.geom.Geometry".into(),
-        name: "Geometry (jts)".into(),
-        package_path: Some("com.vividsolutions.jts.geom".into()),
-      },
       JavaBasicTypeResponse {
         id: "java.net.InetAddress".into(),
         name: "InetAddress".into(),
