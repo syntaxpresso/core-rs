@@ -11,7 +11,7 @@ pub fn execute(
   field_type_kind: &JavaBasicFieldTypeKind,
 ) -> Response<Vec<BasicJavaType>> {
   let cwd_string = cwd.display().to_string();
-  let cmd_name = String::from("get-id-field-types");
+  let cmd_name = String::from("get-java-basic-types");
   match run(field_type_kind) {
     Ok(types) => Response::success(cmd_name, cwd_string, types),
     Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
