@@ -1,4 +1,4 @@
-pub mod basic_java_type;
+pub mod basic_java_type_response;
 pub mod create_jpa_one_to_one_relationship_response;
 pub mod create_jpa_repository_response;
 pub mod error_response;

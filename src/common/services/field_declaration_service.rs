@@ -3,7 +3,7 @@
 use crate::common::services::annotation_service::add_annotation;
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_types::AnnotationInsertionPosition;
-use crate::common::types::field_types::{FieldInsertionPoint, FieldInsertionPosition};
+use crate::common::types::java_basic_types::{FieldInsertionPoint, FieldInsertionPosition};
 use crate::common::types::java_field_modifier::JavaFieldModifier;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use tree_sitter::Node;
