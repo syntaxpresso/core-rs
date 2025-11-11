@@ -8,8 +8,8 @@ use crate::common::services::package_declaration_service::{
 };
 use crate::common::ts_file::TSFile;
 use crate::common::types::basic_field_config::BasicFieldConfig;
-use crate::common::types::field_types::FieldInsertionPosition;
 use crate::common::types::import_types::ImportInsertionPosition;
+use crate::common::types::java_basic_types::FieldInsertionPosition;
 use crate::common::types::java_field_temporal::JavaFieldTemporal;
 use crate::common::types::java_field_time_zone_storage::JavaFieldTimeZoneStorage;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;

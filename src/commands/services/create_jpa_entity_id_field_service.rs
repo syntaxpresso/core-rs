@@ -7,9 +7,9 @@ use crate::common::services::package_declaration_service::{
   get_package_class_scope_node, get_package_declaration_node,
 };
 use crate::common::ts_file::TSFile;
-use crate::common::types::field_types::FieldInsertionPosition;
 use crate::common::types::id_field_config::IdFieldConfig;
 use crate::common::types::import_types::ImportInsertionPosition;
+use crate::common::types::java_basic_types::FieldInsertionPosition;
 use crate::common::types::java_id_generation::JavaIdGeneration;
 use crate::common::types::java_id_generation_type::JavaIdGenerationType;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;

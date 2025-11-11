@@ -41,7 +41,6 @@ pub fn run(cwd: &Path, java_file_type: &JavaFileType) -> Result<Vec<FileResponse
   for ts_file in ts_files {
     match java_file_type {
       JavaFileType::Class => match get_public_class_node(&ts_file) {
-        // TODO: is get_public_class_node falling back to non public classes?
         Some(_) => {
           if let Some(file_response) = create_file_response(&ts_file) {
             files.push(file_response);
