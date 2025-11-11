@@ -26,12 +26,12 @@ use crate::{
     package_name_validator::validate_package_name,
   },
   common::types::{
-    basic_field_config::BasicFieldConfig, cascade_type::CascadeType,
-    collection_type::CollectionType, enum_field_config::EnumFieldConfig, fetch_type::FetchType,
-    field_types::JavaBasicFieldTypeKind, id_field_config::IdFieldConfig,
-    java_enum_type::JavaEnumType, java_field_temporal::JavaFieldTemporal,
-    java_field_time_zone_storage::JavaFieldTimeZoneStorage, java_file_type::JavaFileType,
-    java_id_generation::JavaIdGeneration, java_id_generation_type::JavaIdGenerationType,
+    basic_field_config::BasicFieldConfig, basic_java_types::JavaBasicType,
+    cascade_type::CascadeType, collection_type::CollectionType, enum_field_config::EnumFieldConfig,
+    fetch_type::FetchType, id_field_config::IdFieldConfig, java_enum_type::JavaEnumType,
+    java_field_temporal::JavaFieldTemporal, java_field_time_zone_storage::JavaFieldTimeZoneStorage,
+    java_file_type::JavaFileType, java_id_generation::JavaIdGeneration,
+    java_id_generation_type::JavaIdGenerationType,
     java_source_directory_type::JavaSourceDirectoryType,
     many_to_one_field_config::ManyToOneFieldConfig, mapping_type::MappingType,
     one_to_one_field_config::OneToOneFieldConfig, other_type::OtherType,
@@ -69,8 +69,8 @@ pub enum Commands {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
-    #[arg(long, default_value = "basic")]
-    field_type_kind: JavaBasicFieldTypeKind,
+    #[arg(long, default_value = "all")]
+    basic_type_kind: JavaBasicType,
   },
   GetJavaFiles {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
@@ -319,8 +319,8 @@ impl Commands {
         let response = get_all_packages_command::execute(cwd.as_path(), source_directory);
         response.to_json_pretty().map_err(|e| e.into())
       }
-      Commands::GetJavaBasicTypes { cwd, field_type_kind } => {
-        let response = get_java_basic_types_command::execute(cwd.as_path(), field_type_kind);
+      Commands::GetJavaBasicTypes { cwd, basic_type_kind } => {
+        let response = get_java_basic_types_command::execute(cwd.as_path(), basic_type_kind);
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::GetJavaFiles { cwd, file_type } => {
