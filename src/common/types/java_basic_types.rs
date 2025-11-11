@@ -85,7 +85,7 @@ impl JavaBasicType {
       },
       JavaBasicTypeResponse {
         id: "java.util.Date".into(),
-        name: "Date (util)".into(),
+        name: "Date".into(),
         package_path: Some("java.util".into()),
       },
       JavaBasicTypeResponse {
