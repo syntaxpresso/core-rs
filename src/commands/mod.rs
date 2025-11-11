@@ -69,7 +69,7 @@ pub enum Commands {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
-    #[arg(long, default_value = "all")]
+    #[arg(long, default_value = "all-types")]
     basic_type_kind: JavaBasicType,
   },
   GetJavaFiles {
