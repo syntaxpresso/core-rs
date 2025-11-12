@@ -11,6 +11,7 @@ use crate::{
 
 pub fn execute(
   cwd: &Path,
+  entity_file_b64_src: &str,
   entity_file_path: &Path,
   field_config: IdFieldConfig,
 ) -> Response<FileResponse> {
@@ -26,7 +27,7 @@ pub fn execute(
     );
   }
 
-  match run(cwd, entity_file_path, field_config) {
+  match run(cwd, entity_file_b64_src, entity_file_path, field_config) {
     Ok(response) => Response::success(cmd_name, cwd_string, response),
     Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
   }

@@ -127,10 +127,6 @@ fn extend_jpa_repository(
   );
 }
 
-fn step_parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
-  TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
-}
-
 fn step_extract_entity_type(entity_ts_file: &TSFile) -> String {
   entity_ts_file.get_file_name_without_ext().unwrap_or_else(|| "Unknown".to_string())
 }
@@ -199,11 +195,12 @@ fn step_create_repository_and_save(
 
 pub fn run(
   cwd: &Path,
+  entity_file_b64_src: &str,
   entity_file_path: &Path,
   b64_superclass_source: Option<&str>,
 ) -> Result<CreateJPARepositoryResponse, String> {
   // Step 1: Parse JPA Entity file
-  let entity_ts_file = step_parse_entity_file(entity_file_path)?;
+  let entity_ts_file = TSFile::from_base64_source_code(entity_file_b64_src);
   // Step 2: Extract entity type from file name
   let entity_type = step_extract_entity_type(&entity_ts_file);
   if b64_superclass_source.is_none() {

@@ -10,13 +10,14 @@ use crate::{
 
 pub fn execute(
   cwd: &Path,
-  file_path: &Path,
+  entity_file_b64_src: &str,
+  entity_file_path: &Path,
   b64_superclass_source: Option<&str>,
 ) -> Response<CreateJPARepositoryResponse> {
   let cwd_string = cwd.display().to_string();
   let cmd_name = String::from("create-jpa-repository");
   // Security validation: ensure entity file path is within the cwd
-  let file_path_str = file_path.display().to_string();
+  let file_path_str = entity_file_path.display().to_string();
   if let Err(error_msg) = validate_file_path_within_base(&file_path_str, cwd) {
     return Response::error(
       cmd_name,
@@ -25,7 +26,7 @@ pub fn execute(
     );
   }
 
-  match run(cwd, file_path, b64_superclass_source) {
+  match run(cwd, entity_file_b64_src, entity_file_path, b64_superclass_source) {
     Ok(response) => Response::success(cmd_name, cwd_string, response),
     Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
   }
