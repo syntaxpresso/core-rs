@@ -116,7 +116,10 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
-    entity_file_path: PathBuf, // TODO: read from buffer?
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
 
     #[arg(long, required = false)]
     b64_superclass_source: Option<String>,
@@ -236,8 +239,6 @@ pub enum Commands {
     field_unique: bool,
   },
   CreateJPAOneToOneRelationship {
-    // TODO: this command would require the IDE to check if the the inverse entity file
-    // is loaded on the buffer or provide the file_path/search on core.
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
@@ -272,8 +273,6 @@ pub enum Commands {
     inverse_side_other: Vec<OtherType>,
   },
   CreateJPAManyToOneRelationship {
-    // TODO: this command would require the IDE to check if the the inverse entity file
-    // is loaded on the buffer or provide the file_path/search on core.
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
@@ -372,9 +371,15 @@ impl Commands {
         );
         response.to_json_pretty().map_err(|e| e.into())
       }
-      Commands::CreateJPARepository { cwd, entity_file_path, b64_superclass_source } => {
+      Commands::CreateJPARepository {
+        cwd,
+        entity_file_b64_src,
+        entity_file_path,
+        b64_superclass_source,
+      } => {
         let response = create_jpa_repository_command::execute(
           cwd.as_path(),
+          entity_file_b64_src,
           entity_file_path.as_path(),
           b64_superclass_source.as_deref(),
         );
