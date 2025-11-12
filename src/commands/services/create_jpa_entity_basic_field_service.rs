@@ -44,17 +44,19 @@ fn add_imports(ts_file: &mut TSFile, import_map: &HashMap<String, String>) {
 fn process_imports(
   import_map: &mut HashMap<String, String>,
   processed_field_config: &ProcessedFieldConfig,
+  field_config: &BasicFieldConfig,
 ) {
+  if let Some(ref package_name) = field_config.field_type_package_name {
+    add_to_import_map(import_map, package_name, &field_config.field_type);
+  };
   add_to_import_map(import_map, "jakarta.persistence", "Column");
   if processed_field_config.should_add_timezone_storage_annotation {
     add_to_import_map(import_map, "org.hibernate.annotations", "TimeZoneStorage");
     add_to_import_map(import_map, "org.hibernate.annotations", "TimeZoneStorageType");
-    add_to_import_map(import_map, "java.time", "OffsetDateTime");
   }
   if processed_field_config.should_add_temporal_annotation {
     add_to_import_map(import_map, "jakarta.persistence", "Temporal");
     add_to_import_map(import_map, "jakarta.persistence", "TemporalType");
-    add_to_import_map(import_map, "java.sql", "Date");
   }
   if processed_field_config.should_add_lob_annotation {
     add_to_import_map(import_map, "jakarta.persistence", "Lob");
@@ -141,6 +143,17 @@ fn add_field_and_annotations(
     } else {
       builder.with_argument("@Column", "nullable", "false")?;
     }
+    if field_config.field_type == "BigDecimal"
+      && field_config.field_type_package_name.as_deref() == Some("java.math")
+    {
+      if let Some(precision) = field_config.field_precision.filter(|&p| p != 19) {
+        builder.with_argument("@Column", "precision", &precision.to_string())?;
+      }
+
+      if let Some(scale) = field_config.field_scale.filter(|&s| s != 2) {
+        builder.with_argument("@Column", "scale", &scale.to_string())?;
+      }
+    }
     if processed_field_config.should_add_timezone_storage_annotation
       && timezone_storage_type.ne(&JavaFieldTimeZoneStorage::Auto)
     {
@@ -199,7 +212,7 @@ pub fn run(
   let mut entity_ts_file = parse_entity_file(entity_file_path)?;
   // Step 3: Process imports
   let mut import_map: HashMap<String, String> = HashMap::new();
-  process_imports(&mut import_map, &processed_field_config);
+  process_imports(&mut import_map, &processed_field_config, field_config);
   // Step 4: Add field and annotations
   add_field_and_annotations(&mut entity_ts_file, field_config, &processed_field_config)?;
   // Step 5: Add imports
