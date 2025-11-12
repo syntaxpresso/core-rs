@@ -11,8 +11,8 @@ use crate::{
 
 pub fn execute(
   cwd: &Path,
-  entity_file_path: &Path,
   entity_file_b64_src: &str,
+  entity_file_path: &Path,
   field_config: &BasicFieldConfig,
 ) -> Response<FileResponse> {
   let cwd_string = cwd.display().to_string();
