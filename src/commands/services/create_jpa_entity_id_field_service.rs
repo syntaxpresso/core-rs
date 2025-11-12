@@ -142,14 +142,6 @@ fn add_field_and_annotations(
   Ok(())
 }
 
-fn parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
-  TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
-}
-
-fn save_file(ts_file: &mut TSFile) -> Result<(), String> {
-  ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))
-}
-
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
   let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
   let file_path = ts_file.file_path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
@@ -164,12 +156,13 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
 }
 
 pub fn run(
-  _cwd: &Path,
+  cwd: &Path,
+  entity_file_b64_src: &str,
   entity_file_path: &Path,
   field_config: IdFieldConfig,
 ) -> Result<FileResponse, String> {
   // Step 1: Parse the entity file
-  let mut entity_ts_file = parse_entity_file(entity_file_path)?;
+  let mut entity_ts_file = TSFile::from_base64_source_code(entity_file_b64_src);
   // Step 2: Prepare import map for required imports
   let mut import_map = HashMap::new();
   // Step 3: Add field and annotations to the entity
@@ -177,7 +170,9 @@ pub fn run(
   // Step 4: Add all required imports to the file
   add_imports(&mut entity_ts_file, &import_map);
   // Step 5: Write the modified file back to disk
-  save_file(&mut entity_ts_file)?;
+  entity_ts_file
+    .save_as(entity_file_path, cwd)
+    .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
   // Step 6: Build and return response
   build_file_response(&entity_ts_file)
 }
