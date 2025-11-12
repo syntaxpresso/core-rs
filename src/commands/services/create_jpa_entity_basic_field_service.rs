@@ -14,7 +14,6 @@ use crate::common::types::java_field_temporal::JavaFieldTemporal;
 use crate::common::types::java_field_time_zone_storage::JavaFieldTimeZoneStorage;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::utils::case_util::{self, CaseType};
-use crate::common::utils::string_utils::decode_base64_or_invalid;
 use crate::responses::file_response::FileResponse;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -181,11 +180,6 @@ fn add_field_and_annotations(
   Ok(())
 }
 
-fn parse_entity_file(entity_file_b64_src: &str) -> Result<TSFile, String> {
-  let converted_source_code = decode_base64_or_invalid(entity_file_b64_src);
-  Ok(TSFile::from_source_code(&converted_source_code))
-}
-
 fn save_file(ts_file: &mut TSFile, cwd: &Path, entity_file_path: &Path) -> Result<(), String> {
   ts_file
     .save_as(entity_file_path, cwd)
@@ -214,7 +208,7 @@ pub fn run(
   // Step 1: Process field config
   let processed_field_config = process_field_config(field_config);
   // Step 2: Parse entity file
-  let mut entity_ts_file = parse_entity_file(entity_file_b64_src)?;
+  let mut entity_ts_file = TSFile::from_base64_source_code(entity_file_b64_src);
   // Step 3: Process imports
   let mut import_map: HashMap<String, String> = HashMap::new();
   process_imports(&mut import_map, &processed_field_config, field_config);
