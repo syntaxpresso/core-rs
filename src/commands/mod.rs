@@ -116,6 +116,9 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
     entity_file_path: PathBuf,
 
     #[arg(long, required = false)]
@@ -127,6 +130,9 @@ pub enum Commands {
 
     #[arg(long, required = true)]
     entity_file_path: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_b64_src: String,
 
     #[arg(long, required = true)]
     field_name: String,
@@ -166,6 +172,9 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
     entity_file_path: PathBuf,
 
     #[arg(long, required = true)]
@@ -203,6 +212,9 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
     entity_file_path: PathBuf,
 
     #[arg(long, required = true)]
@@ -229,6 +241,9 @@ pub enum Commands {
   CreateJPAOneToOneRelationship {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    owning_side_entity_file_b64_src: String,
 
     #[arg(long, required = true)]
     owning_side_entity_file_path: PathBuf,
@@ -260,6 +275,9 @@ pub enum Commands {
   CreateJPAManyToOneRelationship {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    owning_side_entity_file_b64_src: String,
 
     #[arg(long, required = true)]
     owning_side_entity_file_path: PathBuf,
@@ -353,9 +371,15 @@ impl Commands {
         );
         response.to_json_pretty().map_err(|e| e.into())
       }
-      Commands::CreateJPARepository { cwd, entity_file_path, b64_superclass_source } => {
+      Commands::CreateJPARepository {
+        cwd,
+        entity_file_b64_src,
+        entity_file_path,
+        b64_superclass_source,
+      } => {
         let response = create_jpa_repository_command::execute(
           cwd.as_path(),
+          entity_file_b64_src,
           entity_file_path.as_path(),
           b64_superclass_source.as_deref(),
         );
@@ -364,6 +388,7 @@ impl Commands {
       Commands::CreateJPAEntityBasicField {
         cwd,
         entity_file_path,
+        entity_file_b64_src,
         field_name,
         field_type,
         field_type_package_name,
@@ -391,6 +416,7 @@ impl Commands {
         };
         let response = create_jpa_entity_basic_field_command::execute(
           cwd.as_path(),
+          entity_file_b64_src,
           entity_file_path.as_path(),
           &field_config,
         );
@@ -398,6 +424,7 @@ impl Commands {
       }
       Commands::CreateJPAEntityIdField {
         cwd,
+        entity_file_b64_src,
         entity_file_path,
         field_name,
         field_type,
@@ -424,6 +451,7 @@ impl Commands {
         };
         let response = create_jpa_entity_id_field_command::execute(
           cwd.as_path(),
+          entity_file_b64_src,
           entity_file_path.as_path(),
           field_config,
         );
@@ -431,6 +459,7 @@ impl Commands {
       }
       Commands::CreateJPAEntityEnumField {
         cwd,
+        entity_file_b64_src,
         entity_file_path,
         field_name,
         enum_type,
@@ -451,6 +480,7 @@ impl Commands {
         };
         let response = create_jpa_entity_enum_field_command::execute(
           cwd.as_path(),
+          entity_file_b64_src,
           entity_file_path.as_path(),
           field_config,
         );
@@ -458,6 +488,7 @@ impl Commands {
       }
       Commands::CreateJPAOneToOneRelationship {
         cwd,
+        owning_side_entity_file_b64_src,
         owning_side_entity_file_path,
         owning_side_field_name,
         inverse_side_field_name,
@@ -478,6 +509,7 @@ impl Commands {
         };
         let response = create_jpa_one_to_one_relationship_command::execute(
           cwd.as_path(),
+          owning_side_entity_file_b64_src,
           owning_side_entity_file_path.as_path(),
           owning_side_field_name.clone(),
           inverse_side_field_name.clone(),
@@ -487,6 +519,7 @@ impl Commands {
       }
       Commands::CreateJPAManyToOneRelationship {
         cwd,
+        owning_side_entity_file_b64_src,
         owning_side_entity_file_path,
         owning_side_field_name,
         inverse_side_field_name,
@@ -511,6 +544,7 @@ impl Commands {
         };
         let response = create_jpa_many_to_one_relationship_command::execute(
           cwd.as_path(),
+          owning_side_entity_file_b64_src,
           owning_side_entity_file_path.as_path(),
           owning_side_field_name.clone(),
           inverse_side_field_name.clone(),

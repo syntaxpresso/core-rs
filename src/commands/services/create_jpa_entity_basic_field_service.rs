@@ -44,17 +44,19 @@ fn add_imports(ts_file: &mut TSFile, import_map: &HashMap<String, String>) {
 fn process_imports(
   import_map: &mut HashMap<String, String>,
   processed_field_config: &ProcessedFieldConfig,
+  field_config: &BasicFieldConfig,
 ) {
+  if let Some(ref package_name) = field_config.field_type_package_name {
+    add_to_import_map(import_map, package_name, &field_config.field_type);
+  };
   add_to_import_map(import_map, "jakarta.persistence", "Column");
   if processed_field_config.should_add_timezone_storage_annotation {
     add_to_import_map(import_map, "org.hibernate.annotations", "TimeZoneStorage");
     add_to_import_map(import_map, "org.hibernate.annotations", "TimeZoneStorageType");
-    add_to_import_map(import_map, "java.time", "OffsetDateTime");
   }
   if processed_field_config.should_add_temporal_annotation {
     add_to_import_map(import_map, "jakarta.persistence", "Temporal");
     add_to_import_map(import_map, "jakarta.persistence", "TemporalType");
-    add_to_import_map(import_map, "java.sql", "Date");
   }
   if processed_field_config.should_add_lob_annotation {
     add_to_import_map(import_map, "jakarta.persistence", "Lob");
@@ -106,8 +108,8 @@ fn add_field_and_annotations(
   field_config: &BasicFieldConfig,
   processed_field_config: &ProcessedFieldConfig,
 ) -> Result<(), String> {
-  let field_name_pascal_case =
-    case_util::auto_convert_case(&field_config.field_name, CaseType::Pascal);
+  let field_name_camel_case =
+    case_util::auto_convert_case(&field_config.field_name, CaseType::Camel);
   let column_name_snake_case =
     case_util::auto_convert_case(&field_config.field_name, CaseType::Snake);
 
@@ -119,7 +121,7 @@ fn add_field_and_annotations(
     visibility_modifier: JavaVisibilityModifier::Private,
     field_modifiers: vec![],
     field_type: &field_config.field_type,
-    field_name: &field_name_pascal_case,
+    field_name: &field_name_camel_case,
     field_initialization: None,
   };
   let timezone_storage_type =
@@ -140,6 +142,17 @@ fn add_field_and_annotations(
       builder.with_argument("@Column", "nullable", "true")?;
     } else {
       builder.with_argument("@Column", "nullable", "false")?;
+    }
+    if field_config.field_type == "BigDecimal"
+      && field_config.field_type_package_name.as_deref() == Some("java.math")
+    {
+      if let Some(precision) = field_config.field_precision.filter(|&p| p != 19) {
+        builder.with_argument("@Column", "precision", &precision.to_string())?;
+      }
+
+      if let Some(scale) = field_config.field_scale.filter(|&s| s != 2) {
+        builder.with_argument("@Column", "scale", &scale.to_string())?;
+      }
     }
     if processed_field_config.should_add_timezone_storage_annotation
       && timezone_storage_type.ne(&JavaFieldTimeZoneStorage::Auto)
@@ -167,14 +180,6 @@ fn add_field_and_annotations(
   Ok(())
 }
 
-fn parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
-  TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
-}
-
-fn save_file(ts_file: &mut TSFile) -> Result<(), String> {
-  ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))
-}
-
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
   let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
   let file_path = ts_file.file_path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
@@ -189,23 +194,26 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
 }
 
 pub fn run(
-  _cwd: &Path,
+  cwd: &Path,
+  entity_file_b64_src: &str,
   entity_file_path: &Path,
   field_config: &BasicFieldConfig,
 ) -> Result<FileResponse, String> {
   // Step 1: Process field config
   let processed_field_config = process_field_config(field_config);
   // Step 2: Parse entity file
-  let mut entity_ts_file = parse_entity_file(entity_file_path)?;
+  let mut entity_ts_file = TSFile::from_base64_source_code(entity_file_b64_src);
   // Step 3: Process imports
   let mut import_map: HashMap<String, String> = HashMap::new();
-  process_imports(&mut import_map, &processed_field_config);
+  process_imports(&mut import_map, &processed_field_config, field_config);
   // Step 4: Add field and annotations
   add_field_and_annotations(&mut entity_ts_file, field_config, &processed_field_config)?;
   // Step 5: Add imports
   add_imports(&mut entity_ts_file, &import_map);
   // Step 6: Save file
-  save_file(&mut entity_ts_file)?;
+  entity_ts_file
+    .save_as(entity_file_path, cwd)
+    .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
   // Step 7: Build and return response
   build_file_response(&entity_ts_file)
 }
