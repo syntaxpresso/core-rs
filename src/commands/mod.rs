@@ -129,6 +129,9 @@ pub enum Commands {
     entity_file_path: PathBuf,
 
     #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
     field_name: String,
 
     #[arg(long, required = true)]
@@ -364,6 +367,7 @@ impl Commands {
       Commands::CreateJPAEntityBasicField {
         cwd,
         entity_file_path,
+        entity_file_b64_src,
         field_name,
         field_type,
         field_type_package_name,
@@ -392,6 +396,7 @@ impl Commands {
         let response = create_jpa_entity_basic_field_command::execute(
           cwd.as_path(),
           entity_file_path.as_path(),
+          entity_file_b64_src,
           &field_config,
         );
         response.to_json_pretty().map_err(|e| e.into())

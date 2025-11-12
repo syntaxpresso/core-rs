@@ -202,8 +202,9 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
 }
 
 pub fn run(
-  _cwd: &Path,
+  cwd: &Path,
   entity_file_path: &Path,
+  entity_file_b64_src: &str,
   field_config: &BasicFieldConfig,
 ) -> Result<FileResponse, String> {
   // Step 1: Process field config

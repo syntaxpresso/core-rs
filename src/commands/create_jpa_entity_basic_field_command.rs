@@ -12,6 +12,7 @@ use crate::{
 pub fn execute(
   cwd: &Path,
   entity_file_path: &Path,
+  entity_file_b64_src: &str,
   field_config: &BasicFieldConfig,
 ) -> Response<FileResponse> {
   let cwd_string = cwd.display().to_string();
@@ -26,7 +27,7 @@ pub fn execute(
     );
   }
 
-  match run(cwd, entity_file_path, field_config) {
+  match run(cwd, entity_file_path, entity_file_b64_src, field_config) {
     Ok(response) => Response::success(cmd_name, cwd_string, response),
     Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
   }
