@@ -143,6 +143,17 @@ fn add_field_and_annotations(
     } else {
       builder.with_argument("@Column", "nullable", "false")?;
     }
+    if field_config.field_type == "BigDecimal"
+      && field_config.field_type_package_name.as_deref() == Some("java.math")
+    {
+      if let Some(precision) = field_config.field_precision.filter(|&p| p != 19) {
+        builder.with_argument("@Column", "precision", &precision.to_string())?;
+      }
+
+      if let Some(scale) = field_config.field_scale.filter(|&s| s != 2) {
+        builder.with_argument("@Column", "scale", &scale.to_string())?;
+      }
+    }
     if processed_field_config.should_add_timezone_storage_annotation
       && timezone_storage_type.ne(&JavaFieldTimeZoneStorage::Auto)
     {
