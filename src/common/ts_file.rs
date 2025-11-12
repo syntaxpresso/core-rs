@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::common::{query::TSQueryBuilder, utils::path_security_util::PathSecurityValidator};
+use base64::Engine;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tree_sitter::{
@@ -101,6 +102,30 @@ impl TSFile {
     new_text: &str,
   ) -> bool {
     self.apply_incremental_edit(start_byte, old_end_byte, new_text)
+  }
+
+  pub fn from_base64_source_code(base64_source_code: &str) -> Self {
+    let mut parser = Parser::new();
+    let language = tree_sitter_java::LANGUAGE;
+    let converted_source_code =
+      match base64::engine::general_purpose::STANDARD.decode(base64_source_code) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+          Ok(s) => s,
+          Err(_) => "Invalid source code".to_string(),
+        },
+        Err(_) => "Invalid source code".to_string(),
+      };
+    parser.set_language(&language.into()).expect("Error loading Java parser");
+    let tree = parser.parse(&converted_source_code, None);
+    TSFile {
+      language: language.into(),
+      parser,
+      file: None,
+      tree,
+      source_code: converted_source_code,
+      new_path: None,
+      modified: false,
+    }
   }
 
   pub fn from_source_code(source_code: &str) -> Self {
