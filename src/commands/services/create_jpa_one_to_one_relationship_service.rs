@@ -29,7 +29,7 @@ struct EntitySideConfig<'a> {
   pub entity_file_path: Option<&'a Path>,
   pub field_name: &'a str,
   pub target_entity_type: &'a str,
-  pub target_entity_type_path: &'a Path,
+  pub target_entity_file_path: &'a Path,
   pub field_config: &'a OneToOneFieldConfig,
   pub side: &'a EntitySide,
   pub mapped_by_field_name: &'a Option<String>,
@@ -226,7 +226,7 @@ fn process_owning_side_entity(
     entity_file_path: None,
     field_name,
     target_entity_type,
-    target_entity_type_path: target_entity_file_path,
+    target_entity_file_path,
     field_config,
     side: &EntitySide::Owning,
     mapped_by_field_name: &None,
@@ -247,7 +247,7 @@ fn process_inverse_side_entity(
     entity_file_path: Some(entity_file_path),
     field_name,
     target_entity_type,
-    target_entity_type_path: target_entity_file_path,
+    target_entity_file_path,
     field_config,
     side: &EntitySide::Owning,
     mapped_by_field_name: &mapped_by_field_name,
@@ -271,7 +271,7 @@ fn process_entity_side(entity_side_config: &EntitySideConfig) -> Result<FileResp
   let processed_imports = process_imports(
     entity_side_config.field_config,
     entity_side_config.target_entity_type,
-    entity_side_config.target_entity_type_path,
+    entity_side_config.target_entity_file_path,
     &annotation_config,
   )?;
   let mut import_map = HashMap::new();

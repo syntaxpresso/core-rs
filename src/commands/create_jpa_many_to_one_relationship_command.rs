@@ -11,6 +11,7 @@ use crate::{
 
 pub fn execute(
   cwd: &Path,
+  owning_side_entity_file_b64_src: &str,
   owning_side_entity_file_path: &Path,
   owning_side_field_name: String,
   inverse_side_field_name: String,
@@ -30,6 +31,7 @@ pub fn execute(
 
   match create_jpa_many_to_one_relationship_service::run(
     cwd,
+    owning_side_entity_file_b64_src,
     owning_side_entity_file_path,
     &owning_side_field_name,
     &inverse_side_field_name,

@@ -245,7 +245,7 @@ pub enum Commands {
     owning_side_entity_file_b64_src: String,
 
     #[arg(long, required = true)]
-    owning_side_entity_file_path: PathBuf, // TODO: read from bufer
+    owning_side_entity_file_path: PathBuf,
 
     #[arg(long, required = true)]
     owning_side_field_name: String,
@@ -278,7 +278,10 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
-    owning_side_entity_file_path: PathBuf, // TODO: read from bufer
+    owning_side_entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    owning_side_entity_file_path: PathBuf,
 
     #[arg(long, required = true)]
     owning_side_field_name: String,
@@ -511,6 +514,7 @@ impl Commands {
       }
       Commands::CreateJPAManyToOneRelationship {
         cwd,
+        owning_side_entity_file_b64_src,
         owning_side_entity_file_path,
         owning_side_field_name,
         inverse_side_field_name,
@@ -535,6 +539,7 @@ impl Commands {
         };
         let response = create_jpa_many_to_one_relationship_command::execute(
           cwd.as_path(),
+          owning_side_entity_file_b64_src,
           owning_side_entity_file_path.as_path(),
           owning_side_field_name.clone(),
           inverse_side_field_name.clone(),
