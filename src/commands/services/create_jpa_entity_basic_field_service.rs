@@ -180,12 +180,6 @@ fn add_field_and_annotations(
   Ok(())
 }
 
-fn save_file(ts_file: &mut TSFile, cwd: &Path, entity_file_path: &Path) -> Result<(), String> {
-  ts_file
-    .save_as(entity_file_path, cwd)
-    .map_err(|e| format!("Unable to save JPA Entity file: {}", e))
-}
-
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
   let file_type = ts_file.get_file_name_without_ext().unwrap_or_default();
   let file_path = ts_file.file_path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
@@ -217,7 +211,9 @@ pub fn run(
   // Step 5: Add imports
   add_imports(&mut entity_ts_file, &import_map);
   // Step 6: Save file
-  save_file(&mut entity_ts_file, cwd, entity_file_path)?;
+  entity_ts_file
+    .save_as(entity_file_path, cwd)
+    .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
   // Step 7: Build and return response
   build_file_response(&entity_ts_file)
 }
