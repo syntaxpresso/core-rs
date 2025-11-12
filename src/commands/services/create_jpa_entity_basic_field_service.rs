@@ -108,8 +108,8 @@ fn add_field_and_annotations(
   field_config: &BasicFieldConfig,
   processed_field_config: &ProcessedFieldConfig,
 ) -> Result<(), String> {
-  let field_name_pascal_case =
-    case_util::auto_convert_case(&field_config.field_name, CaseType::Pascal);
+  let field_name_camel_case =
+    case_util::auto_convert_case(&field_config.field_name, CaseType::Camel);
   let column_name_snake_case =
     case_util::auto_convert_case(&field_config.field_name, CaseType::Snake);
 
@@ -121,7 +121,7 @@ fn add_field_and_annotations(
     visibility_modifier: JavaVisibilityModifier::Private,
     field_modifiers: vec![],
     field_type: &field_config.field_type,
-    field_name: &field_name_pascal_case,
+    field_name: &field_name_camel_case,
     field_initialization: None,
   };
   let timezone_storage_type =
