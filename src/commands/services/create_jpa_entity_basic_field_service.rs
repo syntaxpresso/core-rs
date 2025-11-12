@@ -14,6 +14,7 @@ use crate::common::types::java_field_temporal::JavaFieldTemporal;
 use crate::common::types::java_field_time_zone_storage::JavaFieldTimeZoneStorage;
 use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::utils::case_util::{self, CaseType};
+use crate::common::utils::string_utils::decode_base64_or_invalid;
 use crate::responses::file_response::FileResponse;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -180,12 +181,15 @@ fn add_field_and_annotations(
   Ok(())
 }
 
-fn parse_entity_file(entity_file_path: &Path) -> Result<TSFile, String> {
-  TSFile::from_file(entity_file_path).map_err(|_| "Unable to parse JPA Entity file".to_string())
+fn parse_entity_file(entity_file_b64_src: &str) -> Result<TSFile, String> {
+  let converted_source_code = decode_base64_or_invalid(entity_file_b64_src);
+  Ok(TSFile::from_source_code(&converted_source_code))
 }
 
-fn save_file(ts_file: &mut TSFile) -> Result<(), String> {
-  ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))
+fn save_file(ts_file: &mut TSFile, cwd: &Path, entity_file_path: &Path) -> Result<(), String> {
+  ts_file
+    .save_as(entity_file_path, cwd)
+    .map_err(|e| format!("Unable to save JPA Entity file: {}", e))
 }
 
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
@@ -210,7 +214,7 @@ pub fn run(
   // Step 1: Process field config
   let processed_field_config = process_field_config(field_config);
   // Step 2: Parse entity file
-  let mut entity_ts_file = parse_entity_file(entity_file_path)?;
+  let mut entity_ts_file = parse_entity_file(entity_file_b64_src)?;
   // Step 3: Process imports
   let mut import_map: HashMap<String, String> = HashMap::new();
   process_imports(&mut import_map, &processed_field_config, field_config);
@@ -219,7 +223,7 @@ pub fn run(
   // Step 5: Add imports
   add_imports(&mut entity_ts_file, &import_map);
   // Step 6: Save file
-  save_file(&mut entity_ts_file)?;
+  save_file(&mut entity_ts_file, cwd, entity_file_path)?;
   // Step 7: Build and return response
   build_file_response(&entity_ts_file)
 }
