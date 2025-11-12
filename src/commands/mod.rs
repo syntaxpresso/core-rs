@@ -209,6 +209,9 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
     entity_file_path: PathBuf,
 
     #[arg(long, required = true)]
@@ -441,6 +444,7 @@ impl Commands {
       }
       Commands::CreateJPAEntityEnumField {
         cwd,
+        entity_file_b64_src,
         entity_file_path,
         field_name,
         enum_type,
@@ -461,6 +465,7 @@ impl Commands {
         };
         let response = create_jpa_entity_enum_field_command::execute(
           cwd.as_path(),
+          entity_file_b64_src,
           entity_file_path.as_path(),
           field_config,
         );
