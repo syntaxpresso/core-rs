@@ -116,7 +116,7 @@ pub enum Commands {
     cwd: PathBuf,
 
     #[arg(long, required = true)]
-    entity_file_path: PathBuf,
+    entity_file_path: PathBuf, // TODO: read from buffer?
 
     #[arg(long, required = false)]
     b64_superclass_source: Option<String>,
@@ -236,11 +236,16 @@ pub enum Commands {
     field_unique: bool,
   },
   CreateJPAOneToOneRelationship {
+    // TODO: this command would require the IDE to check if the the inverse entity file
+    // is loaded on the buffer or provide the file_path/search on core.
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
-    owning_side_entity_file_path: PathBuf,
+    owning_side_entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    owning_side_entity_file_path: PathBuf, // TODO: read from bufer
 
     #[arg(long, required = true)]
     owning_side_field_name: String,
@@ -267,11 +272,13 @@ pub enum Commands {
     inverse_side_other: Vec<OtherType>,
   },
   CreateJPAManyToOneRelationship {
+    // TODO: this command would require the IDE to check if the the inverse entity file
+    // is loaded on the buffer or provide the file_path/search on core.
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
     #[arg(long, required = true)]
-    owning_side_entity_file_path: PathBuf,
+    owning_side_entity_file_path: PathBuf, // TODO: read from bufer
 
     #[arg(long, required = true)]
     owning_side_field_name: String,
@@ -473,6 +480,7 @@ impl Commands {
       }
       Commands::CreateJPAOneToOneRelationship {
         cwd,
+        owning_side_entity_file_b64_src,
         owning_side_entity_file_path,
         owning_side_field_name,
         inverse_side_field_name,
@@ -493,6 +501,7 @@ impl Commands {
         };
         let response = create_jpa_one_to_one_relationship_command::execute(
           cwd.as_path(),
+          owning_side_entity_file_b64_src,
           owning_side_entity_file_path.as_path(),
           owning_side_field_name.clone(),
           inverse_side_field_name.clone(),
