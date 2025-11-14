@@ -3,6 +3,9 @@ use std::path::Path;
 use base64::prelude::*;
 use tree_sitter::Node;
 
+use crate::common::services::annotation_service::{
+  find_annotation_node_by_name, find_annotation_value_node_by_key,
+};
 use crate::common::services::class_declaration_service::{
   get_class_declaration_name_node, get_class_superclass_name_node,
 };
@@ -231,6 +234,17 @@ fn get_superclass_name(ts_file: &TSFile, class_declaration_node: &Node) -> Optio
   }
 }
 
+fn get_entity_table_name(ts_file: &TSFile, class_declaration_node: &Node) -> Option<String> {
+  let table_annotation_node =
+    find_annotation_node_by_name(ts_file, *class_declaration_node, "Table");
+  match table_annotation_node {
+    Some(node) => find_annotation_value_node_by_key(ts_file, node, "name")
+      .and_then(|value_node| ts_file.get_text_from_node(&value_node))
+      .map(|text| text.trim_matches('"').to_string()),
+    None => None,
+  }
+}
+
 pub fn run(
   entity_file_path: Option<&Path>,
   b64_source_code: Option<&str>,
@@ -251,8 +265,11 @@ pub fn run(
   let entity_path = ts_file.file_path().map(|path| path.to_string_lossy().to_string());
   // Step 8: Get superclass type
   let superclass_name = get_superclass_name(&ts_file, &public_class_node);
+  // Step 9: Get entity table name
+  let entity_table_name = get_entity_table_name(&ts_file, &public_class_node);
   Ok(GetJpaEntityInfoResponse {
     is_jpa_entity,
+    entity_table_name,
     entity_type,
     entity_package_name,
     entity_path,
