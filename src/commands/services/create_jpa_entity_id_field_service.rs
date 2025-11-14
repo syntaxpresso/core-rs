@@ -18,6 +18,11 @@ use crate::responses::file_response::FileResponse;
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Helper function to convert empty strings to None
+fn optional_string(s: &Option<String>) -> Option<&str> {
+  s.as_ref().and_then(|s| if s.trim().is_empty() { None } else { Some(s.as_str()) })
+}
+
 fn add_to_import_map(
   import_map: &mut HashMap<String, String>,
   package_name: &str,
@@ -81,7 +86,8 @@ fn add_field_and_annotations(
           .eq(&JavaIdGenerationType::EntityExclusiveGeneration)
       {
         add_to_import_map(import_map, "jakarta.persistence", "SequenceGenerator");
-        if let Some(ref generator_name) = field_config.field_generator_name {
+        // generator_name is required for entity_exclusive_generation
+        if let Some(generator_name) = optional_string(&field_config.field_generator_name) {
           builder.with_argument(
             "@GeneratedValue",
             "generator",
@@ -93,7 +99,8 @@ fn add_field_and_annotations(
             "name",
             &format!("\"{}\"", generator_name),
           )?;
-          if let Some(ref sequence_name) = field_config.field_sequence_name {
+          // sequenceName is optional - only add if provided and not empty
+          if let Some(sequence_name) = optional_string(&field_config.field_sequence_name) {
             builder.with_argument(
               "@SequenceGenerator",
               "sequenceName",
