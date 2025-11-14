@@ -6,6 +6,7 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub struct GetJpaEntityInfoResponse {
   pub is_jpa_entity: bool,
+  pub entity_table_name: Option<String>,
   pub entity_type: String,
   pub entity_package_name: String,
   pub superclass_type: Option<String>,
