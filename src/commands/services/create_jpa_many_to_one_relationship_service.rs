@@ -9,7 +9,6 @@ use crate::common::services::package_declaration_service::{
 use crate::common::ts_file::TSFile;
 use crate::common::types::annotation_config::AnnotationConfig;
 use crate::common::types::cascade_type::CascadeType;
-
 use crate::common::types::entity_side::EntitySide;
 use crate::common::types::fetch_type::FetchType;
 use crate::common::types::import_types::ImportInsertionPosition;
@@ -19,23 +18,11 @@ use crate::common::types::java_visibility_modifier::JavaVisibilityModifier;
 use crate::common::types::many_to_one_field_config::ManyToOneFieldConfig;
 use crate::common::types::mapping_type::MappingType;
 use crate::common::types::other_type::OtherType;
-use crate::common::types::processed_imports::ProcessedImports;
 use crate::common::utils::case_util::{self, CaseType};
 use crate::common::utils::path_util::parse_all_files;
 use crate::responses::file_response::FileResponse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-struct EntitySideConfig<'a> {
-  pub entity_file_b64_str: Option<&'a str>,
-  pub entity_file_path: Option<&'a Path>,
-  pub field_name: &'a str,
-  pub target_entity_type: &'a str,
-  pub target_entity_file_path: &'a Path,
-  pub field_config: &'a ManyToOneFieldConfig,
-  pub side: &'a EntitySide,
-  pub mapped_by_field_name: &'a Option<String>,
-}
 
 fn add_to_import_map(
   import_map: &mut HashMap<String, String>,
@@ -92,6 +79,19 @@ fn get_entity_package_name(entity_file_path: &Path) -> Result<String, String> {
     .ok_or_else(|| "Unable to extract entity package name".to_string())
 }
 
+fn parse_entity_file(
+  entity_file_b64_src: Option<&str>,
+  entity_file_path: Option<&Path>,
+) -> Result<TSFile, String> {
+  if let Some(b64_src) = entity_file_b64_src {
+    Ok(TSFile::from_base64_source_code(b64_src))
+  } else if let Some(f_path) = entity_file_path {
+    TSFile::from_file(f_path).map_err(|_| "Unable to parse Entity file".to_string())
+  } else {
+    Err("Unable to parse Entity file".to_string())
+  }
+}
+
 fn build_annotation_config(
   field_config: &ManyToOneFieldConfig,
   side: &EntitySide,
@@ -118,40 +118,47 @@ fn build_annotation_config(
   )
 }
 
-fn process_imports(
-  _field_config: &ManyToOneFieldConfig,
+fn build_import_map(
   target_entity_type: &str,
   target_entity_file_path: &Path,
   annotation_config: &AnnotationConfig,
-) -> Result<ProcessedImports, String> {
-  let mut jpa_imports = Vec::new();
+) -> Result<HashMap<String, String>, String> {
+  let mut import_map = HashMap::new();
+
+  // Add JPA imports based on side
   if annotation_config.is_owning_side {
-    jpa_imports.push(("jakarta.persistence".to_string(), "ManyToOne".to_string()));
+    add_to_import_map(&mut import_map, "jakarta.persistence", "ManyToOne");
   } else {
-    jpa_imports.push(("jakarta.persistence".to_string(), "OneToMany".to_string()));
-    jpa_imports.push((
-      "java.util".to_string(),
-      annotation_config.get_collection_type().unwrap().as_java_type().to_string(),
-    ));
+    add_to_import_map(&mut import_map, "jakarta.persistence", "OneToMany");
+    add_to_import_map(
+      &mut import_map,
+      "java.util",
+      annotation_config.get_collection_type().unwrap().as_java_type(),
+    );
   }
+
+  // Add FetchType import if needed
   if let Some(fetch_type) = annotation_config.get_fetch_type()
     && *fetch_type != FetchType::None
   {
-    jpa_imports.push(("jakarta.persistence".to_string(), "FetchType".to_string()));
+    add_to_import_map(&mut import_map, "jakarta.persistence", "FetchType");
   }
+
+  // Add JoinColumn import if needed
   if annotation_config.needs_join_column {
-    jpa_imports.push(("jakarta.persistence".to_string(), "JoinColumn".to_string()));
+    add_to_import_map(&mut import_map, "jakarta.persistence", "JoinColumn");
   }
+
+  // Add CascadeType import if needed
   if !annotation_config.cascades.is_empty() {
-    jpa_imports.push(("jakarta.persistence".to_string(), "CascadeType".to_string()));
+    add_to_import_map(&mut import_map, "jakarta.persistence", "CascadeType");
   }
+
+  // Add target entity import
   let target_entity_package = get_entity_package_name(target_entity_file_path)?;
-  let mut processed_imports = ProcessedImports::new();
-  processed_imports.set_entity_import(target_entity_package, target_entity_type.to_string());
-  for (package, class_name) in jpa_imports {
-    processed_imports.add_jpa_import(package, class_name);
-  }
-  Ok(processed_imports)
+  add_to_import_map(&mut import_map, &target_entity_package, target_entity_type);
+
+  Ok(import_map)
 }
 
 fn build_cascade_param(cascades: &[CascadeType]) -> Option<String> {
@@ -163,7 +170,7 @@ fn build_cascade_param(cascades: &[CascadeType]) -> Option<String> {
   Some(format!("{{{}}}", cascade_values.join(", ")))
 }
 
-fn add_relationship_field(
+fn add_relationship_field_and_annotations(
   ts_file: &mut TSFile,
   field_name: &str,
   target_entity_type: &str,
@@ -249,86 +256,23 @@ fn add_relationship_field(
   Ok(())
 }
 
-fn is_bidirectional_mapping(field_config: &ManyToOneFieldConfig) -> bool {
-  field_config.mapping_type != Some(MappingType::UnidirectionalJoinColumn)
-}
-
-fn process_owning_side_entity(
-  entity_file_b64_src: &str,
-  field_name: &str,
-  target_entity_type: &str,
-  target_entity_file_path: &Path,
-  field_config: &ManyToOneFieldConfig,
-) -> Result<FileResponse, String> {
-  let entity_side_config = EntitySideConfig {
-    entity_file_b64_str: Some(entity_file_b64_src),
-    entity_file_path: None,
-    field_name,
-    target_entity_type,
-    target_entity_file_path,
-    field_config,
-    side: &EntitySide::Owning,
-    mapped_by_field_name: &None,
-  };
-  process_entity_side(&entity_side_config)
-}
-
-fn process_inverse_side_entity(
-  entity_file_path: &Path,
-  field_name: &str,
-  target_entity_type: &str,
-  target_entity_file_path: &Path,
-  field_config: &ManyToOneFieldConfig,
-  mapped_by_field_name: Option<String>,
-) -> Result<FileResponse, String> {
-  let entity_side_config = EntitySideConfig {
-    entity_file_b64_str: None,
-    entity_file_path: Some(entity_file_path),
-    field_name,
-    target_entity_type,
-    target_entity_file_path,
-    field_config,
-    side: &EntitySide::Owning,
-    mapped_by_field_name: &mapped_by_field_name,
-  };
-  process_entity_side(&entity_side_config)
-}
-
-fn process_entity_side(entity_side_config: &EntitySideConfig) -> Result<FileResponse, String> {
-  let mut entity_ts_file = if let Some(b64_src) = entity_side_config.entity_file_b64_str {
-    TSFile::from_base64_source_code(b64_src)
-  } else if let Some(f_path) = entity_side_config.entity_file_path {
-    TSFile::from_file(f_path).map_err(|_| "Unable to parse Entity file".to_string())?
+fn save_entity_file(
+  ts_file: &mut TSFile,
+  save_path: Option<&Path>,
+  cwd: Option<&Path>,
+) -> Result<(), String> {
+  if let Some(path) = save_path {
+    if let Some(working_dir) = cwd {
+      ts_file
+        .save_as(path, working_dir)
+        .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
+    } else {
+      return Err("Working directory required for save_as".to_string());
+    }
   } else {
-    return Err("Unable to parse Entity file".to_string());
-  };
-  let annotation_config = build_annotation_config(
-    entity_side_config.field_config,
-    entity_side_config.side,
-    entity_side_config.mapped_by_field_name,
-  );
-  let processed_imports = process_imports(
-    entity_side_config.field_config,
-    entity_side_config.target_entity_type,
-    entity_side_config.target_entity_file_path,
-    &annotation_config,
-  )?;
-  let mut import_map = HashMap::new();
-  for (package, class_name) in processed_imports.jpa_imports {
-    add_to_import_map(&mut import_map, &package, &class_name);
+    ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
   }
-  if let Some((package, class_name)) = processed_imports.entity_class_import {
-    add_to_import_map(&mut import_map, &package, &class_name);
-  }
-  add_relationship_field(
-    &mut entity_ts_file,
-    entity_side_config.field_name,
-    entity_side_config.target_entity_type,
-    &annotation_config,
-  )?;
-  add_imports(&mut entity_ts_file, &import_map);
-  entity_ts_file.save().map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
-  build_file_response(&entity_ts_file)
+  Ok(())
 }
 
 fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
@@ -342,6 +286,99 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
     .unwrap_or("")
     .to_string();
   Ok(FileResponse { file_type, file_package_name, file_path })
+}
+
+fn is_bidirectional_mapping(field_config: &ManyToOneFieldConfig) -> bool {
+  field_config.mapping_type != Some(MappingType::UnidirectionalJoinColumn)
+}
+
+struct ProcessEntitySideParams<'a> {
+  entity_file_b64_src: Option<&'a str>,
+  entity_file_path: Option<&'a Path>,
+  save_path: Option<&'a Path>,
+  cwd: Option<&'a Path>,
+  field_name: &'a str,
+  target_entity_type: &'a str,
+  target_entity_file_path: &'a Path,
+  field_config: &'a ManyToOneFieldConfig,
+  side: EntitySide,
+  mapped_by_field_name: Option<&'a str>,
+}
+
+fn process_owning_side_entity(
+  cwd: &Path,
+  entity_file_b64_src: &str,
+  entity_file_path: &Path,
+  field_name: &str,
+  target_entity_type: &str,
+  target_entity_file_path: &Path,
+  field_config: &ManyToOneFieldConfig,
+) -> Result<FileResponse, String> {
+  process_entity_side(ProcessEntitySideParams {
+    entity_file_b64_src: Some(entity_file_b64_src),
+    entity_file_path: None,
+    save_path: Some(entity_file_path),
+    cwd: Some(cwd),
+    field_name,
+    target_entity_type,
+    target_entity_file_path,
+    field_config,
+    side: EntitySide::Owning,
+    mapped_by_field_name: None,
+  })
+}
+
+fn process_inverse_side_entity(
+  cwd: &Path,
+  entity_file_path: &Path,
+  field_name: &str,
+  target_entity_type: &str,
+  target_entity_file_path: &Path,
+  field_config: &ManyToOneFieldConfig,
+  mapped_by_field_name: &str,
+) -> Result<FileResponse, String> {
+  process_entity_side(ProcessEntitySideParams {
+    entity_file_b64_src: None,
+    entity_file_path: Some(entity_file_path),
+    save_path: None,
+    cwd: Some(cwd),
+    field_name,
+    target_entity_type,
+    target_entity_file_path,
+    field_config,
+    side: EntitySide::Inverse,
+    mapped_by_field_name: Some(mapped_by_field_name),
+  })
+}
+
+fn process_entity_side(params: ProcessEntitySideParams) -> Result<FileResponse, String> {
+  // Step 1: Parse entity file
+  let mut entity_ts_file = parse_entity_file(params.entity_file_b64_src, params.entity_file_path)?;
+  // Step 2: Build annotation config
+  let annotation_config = build_annotation_config(
+    params.field_config,
+    &params.side,
+    &params.mapped_by_field_name.map(String::from),
+  );
+  // Step 3: Build import map
+  let import_map = build_import_map(
+    params.target_entity_type,
+    params.target_entity_file_path,
+    &annotation_config,
+  )?;
+  // Step 4: Add relationship field and annotations
+  add_relationship_field_and_annotations(
+    &mut entity_ts_file,
+    params.field_name,
+    params.target_entity_type,
+    &annotation_config,
+  )?;
+  // Step 5: Add imports
+  add_imports(&mut entity_ts_file, &import_map);
+  // Step 6: Save file
+  save_entity_file(&mut entity_ts_file, params.save_path, params.cwd)?;
+  // Step 7: Build and return response
+  build_file_response(&entity_ts_file)
 }
 
 pub fn run(
@@ -358,7 +395,9 @@ pub fn run(
   let owning_entity_class_name = extract_owning_entity_class_name(owning_side_entity_file_path)?;
   // Step 3: Process owning side entity (ManyToOne side)
   let owning_response = process_owning_side_entity(
+    cwd,
     owning_side_entity_file_b64_src,
+    owning_side_entity_file_path,
     owning_side_field_name,
     &field_config.inverse_field_type,
     &inverse_entity_file_path,
@@ -368,12 +407,13 @@ pub fn run(
   // Step 4: Process inverse side entity (OneToMany side) if bidirectional
   if is_bidirectional_mapping(field_config) {
     let inverse_response = process_inverse_side_entity(
+      cwd,
       &inverse_entity_file_path,
       inverse_side_field_name,
       &owning_entity_class_name,
       owning_side_entity_file_path,
       field_config,
-      Some(owning_side_field_name.to_string()),
+      owning_side_field_name,
     )?;
     responses.push(inverse_response);
   }
