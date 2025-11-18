@@ -21,12 +21,14 @@ Syntaxpresso Core is designed as a backend service for IDE plugins, offering com
 Syntaxpresso Core is available in two variants:
 
 ### CLI-only (Default)
-- Smaller binary size (~3.4MB)
+
+- Smaller binary
 - Command-line interface with JSON output
-- Designed for IDE plugin integration
+- Designed for IDE plugin integration with your own UI
 - Binary names: `syntaxpresso-core-{platform}-{arch}`
 
 ### UI-enabled
+
 - Includes interactive Terminal UI (TUI) for visual code generation
 - Built with the `ui` feature flag
 - Larger binary size (~4.0MB) due to UI dependencies
@@ -35,11 +37,13 @@ Syntaxpresso Core is available in two variants:
 ### Choosing a Variant
 
 **Use CLI-only if:**
-- You're integrating with an IDE plugin (Neovim, VSCode, etc.)
+
+- You're integrating with an IDE plugin (Neovim, VSCode, etc.) with your own UI
 - You need JSON output for programmatic consumption
 - You want the smallest binary size
 
 **Use UI-enabled if:**
+
 - You want an interactive terminal interface for code generation
 - You prefer visual forms over command-line arguments
 - You're using it as a standalone tool
@@ -77,17 +81,24 @@ Syntaxpresso Core is available in two variants:
 
 The UI-enabled binary includes interactive terminal forms for:
 
-- **`ui java-file`**: Interactive form to create Java files
-- **`ui jpa-entity`**: Interactive form to create JPA entities
-- **`ui entity-field`**: Interactive form to add fields to entities
-- **`ui entity-relationship`**: Interactive form to create entity relationships
+- **`ui create-java-file`**: Interactive form to create Java files
+- **`ui create-jpa-entity`**: Interactive form to create JPA entities
+- **`ui create-jpa-entity-basic-field`**: Interactive form to add fields to entities
+- **`ui create-jpa-one-to-one-relationship`**: Interactive form to create entity relationships
+- **`ui create-jpa-repository`**: Interactive form to create JPA repositories
 
 ```bash
 # Launch interactive UI for creating a Java file
-./syntaxpresso-core ui java-file --cwd /path/to/project
+./syntaxpresso-core ui create-java-file --cwd /path/to/project
 
 # Launch UI to add a field to an entity
-./syntaxpresso-core ui entity-field \
+./syntaxpresso-core ui create-jpa-entity-basic-field \
+  --cwd /path/to/project \
+  --entity-file-path /path/to/User.java \
+  --entity-file-b64-src <base64-encoded-source>
+
+# Launch UI to create a JPA repository for an entity
+./syntaxpresso-core ui create-jpa-repository \
   --cwd /path/to/project \
   --entity-file-path /path/to/User.java \
   --entity-file-b64-src <base64-encoded-source>
@@ -100,12 +111,14 @@ The UI-enabled binary includes interactive terminal forms for:
 Download the appropriate binary for your platform from the [Releases page](https://github.com/syntaxpresso/core/releases):
 
 **CLI-only binaries:**
+
 - `syntaxpresso-core-linux-amd64` - Linux x86_64
 - `syntaxpresso-core-macos-amd64` - macOS Intel
 - `syntaxpresso-core-macos-arm64` - macOS Apple Silicon
 - `syntaxpresso-core-windows-amd64.exe` - Windows x86_64
 
 **UI-enabled binaries:**
+
 - `syntaxpresso-core-ui-linux-amd64` - Linux x86_64
 - `syntaxpresso-core-ui-macos-amd64` - macOS Intel
 - `syntaxpresso-core-ui-macos-arm64` - macOS Apple Silicon
@@ -114,11 +127,13 @@ Download the appropriate binary for your platform from the [Releases page](https
 ### Building from Source
 
 **CLI-only:**
+
 ```bash
 cargo build --release
 ```
 
 **UI-enabled:**
+
 ```bash
 cargo build --release --features ui
 ```
@@ -201,6 +216,7 @@ Syntaxpresso Core follows a **dual-interface architecture** supporting both prog
 The core is a stateless CLI application that processes one request per invocation and outputs a single JSON response to stdout before exiting.
 
 **Request Flow:**
+
 1. **IDE/Frontend to Core**: Spawns the binary as a new process with CLI arguments
 2. **Routing**: Clap parses arguments and routes to either:
    - **Programmatic Path**: Direct command execution → Service layer → JSON response
@@ -211,6 +227,7 @@ The core is a stateless CLI application that processes one request per invocatio
 6. **Termination**: Process exits with status code (0 = success, 1 = error)
 
 **Response Format:**
+
 ```json
 {
   "command": "create-jpa-entity",
@@ -225,6 +242,7 @@ The core is a stateless CLI application that processes one request per invocatio
 ```
 
 Error responses include `errorReason` instead of `data`:
+
 ```json
 {
   "command": "create-jpa-entity",
@@ -323,11 +341,13 @@ src/
 ### Building
 
 **CLI-only:**
+
 ```bash
 cargo build
 ```
 
 **With UI:**
+
 ```bash
 cargo build --features ui
 ```
@@ -337,6 +357,92 @@ cargo build --features ui
 ```bash
 cargo test
 ```
+
+### Local Development Setup
+
+#### Neovim Plugin Development
+
+To develop and test the Neovim plugin with a local build of syntaxpresso-core:
+
+1. **Build the core with UI support:**
+
+   ```bash
+   cd core
+   cargo build --release --features ui
+   ```
+
+2. **Configure the plugin to use your local build:**
+
+   Add this to your Neovim plugin configuration (e.g., using lazy.nvim):
+
+   ```lua
+   {
+     "syntaxpresso/syntaxpresso.nvim",
+     dir = "/path/to/your/syntaxpresso/syntaxpresso.nvim",
+     config = function()
+       require("syntaxpresso").setup({
+         executable_path = "/path/to/your/syntaxpresso/core/target/release/syntaxpresso-core",
+       })
+     end,
+     dependencies = {
+       "grapp-dev/nui-components.nvim",
+       "MunifTanjim/nui.nvim",
+       "nvimtools/none-ls.nvim",
+     },
+   }
+   ```
+
+3. **Restart Neovim** and the plugin will use your local development build.
+
+````
+
+#### Standalone UI Testing
+
+You can test the interactive UI forms without Neovim:
+
+1. **Build with UI features:**
+
+   ```bash
+   cd core
+   cargo build --release --features ui
+````
+
+2. **Run UI commands directly from terminal:**
+
+   ```bash
+   # Test Java file creation form
+   ./target/release/syntaxpresso-core ui create-java-file --cwd /path/to/java/project
+
+   # Test JPA entity creation form
+   ./target/release/syntaxpresso-core ui create-jpa-entity --cwd /path/to/java/project
+
+   # Test entity field creation form (requires entity file)
+   ./target/release/syntaxpresso-core ui create-jpa-entity-basic-field \
+     --cwd /path/to/java/project \
+     --entity-file-path /path/to/User.java \
+     --entity-file-b64-src $(base64 -w 0 /path/to/User.java)
+
+   # Test JPA repository creation form (requires entity file)
+   ./target/release/syntaxpresso-core ui create-jpa-repository \
+     --cwd /path/to/java/project \
+     --entity-file-path /path/to/User.java \
+     --entity-file-b64-src $(base64 -w 0 /path/to/User.java)
+   ```
+
+3. **Interact with forms using keyboard:**
+   - `Tab` / `Shift+Tab` - Navigate between fields
+   - `Enter` - Select/confirm
+   - `Esc` - Cancel
+   - `i` - Enter insert mode (for text fields)
+   - `a` - Enter insert mode at end of text
+   - Arrow keys - Navigate lists and autocomplete
+
+This approach is useful for:
+
+- Testing UI changes without restarting Neovim
+- Debugging TUI form behavior in isolation
+- Developing new interactive commands
+- UI/UX iteration and design validation
 
 ## Contributing
 
