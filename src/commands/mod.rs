@@ -51,25 +51,18 @@ use crate::ui::{
 #[cfg(feature = "ui")]
 #[derive(Subcommand)]
 pub enum UiCommands {
-  JavaFile {
+  #[command(name = "create-java-file")]
+  CreateJavaFile {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
   },
-  JpaEntity {
+  #[command(name = "create-jpa-entity")]
+  CreateJpaEntity {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
   },
-  EntityField {
-    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
-    cwd: PathBuf,
-
-    #[arg(long, required = true)]
-    entity_file_b64_src: String,
-
-    #[arg(long, required = true)]
-    entity_file_path: PathBuf,
-  },
-  EntityRelationship {
+  #[command(name = "create-jpa-entity-basic-field")]
+  CreateJpaEntityBasicField {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
@@ -79,7 +72,19 @@ pub enum UiCommands {
     #[arg(long, required = true)]
     entity_file_path: PathBuf,
   },
-  JpaRepository {
+  #[command(name = "create-jpa-one-to-one-relationship")]
+  CreateJpaOneToOneRelationship {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
+  },
+  #[command(name = "create-jpa-repository")]
+  CreateJpaRepository {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
@@ -95,17 +100,17 @@ pub enum UiCommands {
 impl UiCommands {
   pub fn execute(&self) -> Result<(), Box<dyn std::error::Error>> {
     match self {
-      UiCommands::JavaFile { cwd } => {
+      UiCommands::CreateJavaFile { cwd } => {
         let form = CreateJavaFileForm::new(cwd.clone());
         run_ui_command(form)?;
         Ok(())
       }
-      UiCommands::JpaEntity { cwd } => {
+      UiCommands::CreateJpaEntity { cwd } => {
         let form = CreateJpaEntityForm::new(cwd.clone());
         run_ui_command(form)?;
         Ok(())
       }
-      UiCommands::EntityField { cwd, entity_file_b64_src, entity_file_path } => {
+      UiCommands::CreateJpaEntityBasicField { cwd, entity_file_b64_src, entity_file_path } => {
         let form = CreateEntityFieldForm::new(
           cwd.clone(),
           entity_file_b64_src.clone(),
@@ -114,7 +119,7 @@ impl UiCommands {
         run_ui_command(form)?;
         Ok(())
       }
-      UiCommands::EntityRelationship { cwd, entity_file_b64_src, entity_file_path } => {
+      UiCommands::CreateJpaOneToOneRelationship { cwd, entity_file_b64_src, entity_file_path } => {
         let form = CreateEntityRelationshipForm::new(
           cwd.clone(),
           entity_file_b64_src.clone(),
@@ -123,7 +128,7 @@ impl UiCommands {
         run_ui_command(form)?;
         Ok(())
       }
-      UiCommands::JpaRepository { cwd, entity_file_b64_src, entity_file_path } => {
+      UiCommands::CreateJpaRepository { cwd, entity_file_b64_src, entity_file_path } => {
         let form = CreateJpaRepositoryForm::new(
           cwd.clone(),
           entity_file_b64_src.clone(),
