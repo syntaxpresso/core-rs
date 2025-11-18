@@ -43,7 +43,7 @@ use crate::ui::{
   forms::{
     create_entity_field::CreateEntityFieldForm,
     create_entity_relationship::CreateEntityRelationshipForm, create_java_file::CreateJavaFileForm,
-    create_jpa_entity::CreateJpaEntityForm,
+    create_jpa_entity::CreateJpaEntityForm, create_jpa_repository::CreateJpaRepositoryForm,
   },
   runner::run_ui_command,
 };
@@ -70,6 +70,16 @@ pub enum UiCommands {
     entity_file_path: PathBuf,
   },
   EntityRelationship {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
+  },
+  JpaRepository {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
 
@@ -106,6 +116,15 @@ impl UiCommands {
       }
       UiCommands::EntityRelationship { cwd, entity_file_b64_src, entity_file_path } => {
         let form = CreateEntityRelationshipForm::new(
+          cwd.clone(),
+          entity_file_b64_src.clone(),
+          entity_file_path.clone(),
+        );
+        run_ui_command(form)?;
+        Ok(())
+      }
+      UiCommands::JpaRepository { cwd, entity_file_b64_src, entity_file_path } => {
+        let form = CreateJpaRepositoryForm::new(
           cwd.clone(),
           entity_file_b64_src.clone(),
           entity_file_path.clone(),
