@@ -1,11 +1,6 @@
-pub mod commands;
-pub mod common;
-pub mod responses;
-
 use clap::Parser;
-use commands::Commands;
-
-use crate::responses::error_response::ErrorResponse;
+use syntaxpresso_core::commands::Commands;
+use syntaxpresso_core::responses::error_response::ErrorResponse;
 
 #[derive(Parser)]
 #[command(name = "syntaxpresso-core")]

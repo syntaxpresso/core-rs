@@ -20,17 +20,16 @@ pub enum SecurityEvent {
 
 /// Log a security event to stderr for audit purposes
 /// This provides a simple audit trail without requiring external logging dependencies
+/// Note: Only logs failures and security concerns, not successful validations (to avoid noise)
 fn log_security_event(event: &SecurityEvent) {
   let timestamp = std::time::SystemTime::now()
     .duration_since(std::time::UNIX_EPOCH)
     .unwrap_or_else(|_| std::time::Duration::from_secs(0))
     .as_secs();
   match event {
-    SecurityEvent::PathValidationSuccess { target_path, base_path } => {
-      eprintln!(
-        "[SECURITY] [{}] Path validation SUCCESS: '{}' within base '{}'",
-        timestamp, target_path, base_path
-      );
+    SecurityEvent::PathValidationSuccess { .. } => {
+      // Don't log successful validations to avoid cluttering output
+      // Uncomment for debugging: eprintln!("[SECURITY] [{}] Path validation SUCCESS: '{}' within base '{}'", timestamp, target_path, base_path);
     }
     SecurityEvent::PathValidationFailure { target_path, base_path, reason } => {
       eprintln!(

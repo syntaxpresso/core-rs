@@ -38,8 +38,115 @@ use crate::{
   },
 };
 
+#[cfg(feature = "ui")]
+use crate::ui::{
+  forms::{
+    create_entity_field::CreateEntityFieldForm,
+    create_entity_relationship::CreateEntityRelationshipForm, create_java_file::CreateJavaFileForm,
+    create_jpa_entity::CreateJpaEntityForm, create_jpa_repository::CreateJpaRepositoryForm,
+  },
+  runner::run_ui_command,
+};
+
+#[cfg(feature = "ui")]
+#[derive(Subcommand)]
+pub enum UiCommands {
+  #[command(name = "create-java-file")]
+  CreateJavaFile {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+  },
+  #[command(name = "create-jpa-entity")]
+  CreateJpaEntity {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+  },
+  #[command(name = "create-jpa-entity-basic-field")]
+  CreateJpaEntityBasicField {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
+  },
+  #[command(name = "create-jpa-one-to-one-relationship")]
+  CreateJpaOneToOneRelationship {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
+  },
+  #[command(name = "create-jpa-repository")]
+  CreateJpaRepository {
+    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
+    cwd: PathBuf,
+
+    #[arg(long, required = true)]
+    entity_file_b64_src: String,
+
+    #[arg(long, required = true)]
+    entity_file_path: PathBuf,
+  },
+}
+
+#[cfg(feature = "ui")]
+impl UiCommands {
+  pub fn execute(&self) -> Result<(), Box<dyn std::error::Error>> {
+    match self {
+      UiCommands::CreateJavaFile { cwd } => {
+        let form = CreateJavaFileForm::new(cwd.clone());
+        run_ui_command(form)?;
+        Ok(())
+      }
+      UiCommands::CreateJpaEntity { cwd } => {
+        let form = CreateJpaEntityForm::new(cwd.clone());
+        run_ui_command(form)?;
+        Ok(())
+      }
+      UiCommands::CreateJpaEntityBasicField { cwd, entity_file_b64_src, entity_file_path } => {
+        let form = CreateEntityFieldForm::new(
+          cwd.clone(),
+          entity_file_b64_src.clone(),
+          entity_file_path.clone(),
+        );
+        run_ui_command(form)?;
+        Ok(())
+      }
+      UiCommands::CreateJpaOneToOneRelationship { cwd, entity_file_b64_src, entity_file_path } => {
+        let form = CreateEntityRelationshipForm::new(
+          cwd.clone(),
+          entity_file_b64_src.clone(),
+          entity_file_path.clone(),
+        );
+        run_ui_command(form)?;
+        Ok(())
+      }
+      UiCommands::CreateJpaRepository { cwd, entity_file_b64_src, entity_file_path } => {
+        let form = CreateJpaRepositoryForm::new(
+          cwd.clone(),
+          entity_file_b64_src.clone(),
+          entity_file_path.clone(),
+        );
+        run_ui_command(form)?;
+        Ok(())
+      }
+    }
+  }
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
+  #[cfg(feature = "ui")]
+  #[command(subcommand)]
+  Ui(UiCommands),
+
   GetAllJPAEntities {
     #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
     cwd: PathBuf,
@@ -66,9 +173,6 @@ pub enum Commands {
     source_directory: JavaSourceDirectoryType,
   },
   GetJavaBasicTypes {
-    #[arg(long, value_parser = validate_directory_unrestricted, required = true)]
-    cwd: PathBuf,
-
     #[arg(long, default_value = "all-types")]
     basic_type_kind: JavaBasicType,
   },
@@ -317,6 +421,11 @@ pub enum Commands {
 impl Commands {
   pub fn execute(&self) -> Result<String, Box<dyn std::error::Error>> {
     match self {
+      #[cfg(feature = "ui")]
+      Commands::Ui(ui_command) => {
+        ui_command.execute()?;
+        Ok(String::new())
+      }
       Commands::GetAllJPAEntities { cwd } => {
         let response = get_all_jpa_entities_command::execute(cwd.as_path());
         response.to_json_pretty().map_err(|e| e.into())
@@ -337,8 +446,8 @@ impl Commands {
         let response = get_all_packages_command::execute(cwd.as_path(), source_directory);
         response.to_json_pretty().map_err(|e| e.into())
       }
-      Commands::GetJavaBasicTypes { cwd, basic_type_kind } => {
-        let response = get_java_basic_types_command::execute(cwd.as_path(), basic_type_kind);
+      Commands::GetJavaBasicTypes { basic_type_kind } => {
+        let response = get_java_basic_types_command::execute(basic_type_kind);
         response.to_json_pretty().map_err(|e| e.into())
       }
       Commands::GetJavaFiles { cwd, file_type } => {

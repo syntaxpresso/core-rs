@@ -16,9 +16,41 @@ A standalone Rust-based CLI backend for IDE plugins that provides advanced Java 
 
 Syntaxpresso Core is designed as a backend service for IDE plugins, offering comprehensive Java code generation and manipulation through a CLI interface. The tool specializes in JPA (Java Persistence API) entity management, providing developers with automated code generation for complex Java persistence scenarios.
 
+## Binary Variants
+
+Syntaxpresso Core is available in two variants:
+
+### CLI-only (Default)
+
+- Smaller binary
+- Command-line interface with JSON output
+- Designed for IDE plugin integration with your own UI
+- Binary names: `syntaxpresso-core-{platform}-{arch}`
+
+### UI-enabled
+
+- Includes interactive Terminal UI (TUI) for visual code generation
+- Built with the `ui` feature flag
+- Larger binary size (~4.0MB) due to UI dependencies
+- Binary names: `syntaxpresso-core-ui-{platform}-{arch}`
+
+### Choosing a Variant
+
+**Use CLI-only if:**
+
+- You're integrating with an IDE plugin (Neovim, VSCode, etc.) with your own UI
+- You need JSON output for programmatic consumption
+- You want the smallest binary size
+
+**Use UI-enabled if:**
+
+- You want an interactive terminal interface for code generation
+- You prefer visual forms over command-line arguments
+- You're using it as a standalone tool
+
 ## Features
 
-### Available Commands
+### Available Commands (CLI)
 
 #### Entity Management
 
@@ -44,6 +76,69 @@ Syntaxpresso Core is designed as a backend service for IDE plugins, offering com
 
 - **`create-jpa-repository`**: Generate Spring Data JPA repository interfaces
 - **`create-java-file`**: Create basic Java files (classes, interfaces, enums)
+
+### UI Commands (UI-enabled binary only)
+
+The UI-enabled binary includes interactive terminal forms for:
+
+- **`ui create-java-file`**: Interactive form to create Java files
+- **`ui create-jpa-entity`**: Interactive form to create JPA entities
+- **`ui create-jpa-entity-basic-field`**: Interactive form to add fields to entities
+- **`ui create-jpa-one-to-one-relationship`**: Interactive form to create entity relationships
+- **`ui create-jpa-repository`**: Interactive form to create JPA repositories
+
+```bash
+# Launch interactive UI for creating a Java file
+./syntaxpresso-core ui create-java-file --cwd /path/to/project
+
+# Launch UI to add a field to an entity
+./syntaxpresso-core ui create-jpa-entity-basic-field \
+  --cwd /path/to/project \
+  --entity-file-path /path/to/User.java \
+  --entity-file-b64-src <base64-encoded-source>
+
+# Launch UI to create a JPA repository for an entity
+./syntaxpresso-core ui create-jpa-repository \
+  --cwd /path/to/project \
+  --entity-file-path /path/to/User.java \
+  --entity-file-b64-src <base64-encoded-source>
+```
+
+## Installation
+
+### From GitHub Releases
+
+Download the appropriate binary for your platform from the [Releases page](https://github.com/syntaxpresso/core/releases):
+
+**CLI-only binaries:**
+
+- `syntaxpresso-core-linux-amd64` - Linux x86_64
+- `syntaxpresso-core-macos-amd64` - macOS Intel
+- `syntaxpresso-core-macos-arm64` - macOS Apple Silicon
+- `syntaxpresso-core-windows-amd64.exe` - Windows x86_64
+
+**UI-enabled binaries:**
+
+- `syntaxpresso-core-ui-linux-amd64` - Linux x86_64
+- `syntaxpresso-core-ui-macos-amd64` - macOS Intel
+- `syntaxpresso-core-ui-macos-arm64` - macOS Apple Silicon
+- `syntaxpresso-core-ui-windows-amd64.exe` - Windows x86_64
+
+### Building from Source
+
+**CLI-only:**
+
+```bash
+cargo build --release
+```
+
+**UI-enabled:**
+
+```bash
+cargo build --release --features ui
+```
+
+The binary will be available at `target/release/syntaxpresso-core`.
 
 ## Usage
 
@@ -114,13 +209,102 @@ Error responses follow this format:
 
 ### Architecture
 
-Communication follows a **unidirectional request-response model** handled via standard input/output (stdio). The syntaxpresso-core is a stateless CLI application that only prints a single JSON response to stdout before exiting; it never sends commands back to the IDE.
+Syntaxpresso Core follows a **dual-interface architecture** supporting both programmatic CLI access and interactive TUI, with a unidirectional request-response model.
 
-- Request (IDE to Core): The IDE plugin spawns the compiled syntaxpresso-core binary as a new process for each request.
-- All required information (the command, file paths, options) is passed as CLI arguments at spawn time.
-- Execution (Core): The Rust application parses the arguments, executes the requested command, and performs all logic internally.
-- Response (Core to IDE): Upon completion, the Rust core serializes a standard Response object into a single JSON string and prints it to stdout.
-- Result (IDE): The IDE plugin captures this stdout, parses the JSON, and uses the structured data (e.g., file paths, success status, or error details) to update its state. The Rust process then terminates.
+#### Communication Model
+
+The core is a stateless CLI application that processes one request per invocation and outputs a single JSON response to stdout before exiting.
+
+**Request Flow:**
+
+1. **IDE/Frontend to Core**: Spawns the binary as a new process with CLI arguments
+2. **Routing**: Clap parses arguments and routes to either:
+   - **Programmatic Path**: Direct command execution → Service layer → JSON response
+   - **Interactive Path** (UI-enabled only): TUI form → User input → Command layer → Service layer → JSON response
+3. **Execution**: Command layer calls service layer for business logic
+4. **Response**: Command layer builds standardized `Response<T>` object
+5. **Output**: Serializes response to JSON and prints to stdout
+6. **Termination**: Process exits with status code (0 = success, 1 = error)
+
+**Response Format:**
+
+```json
+{
+  "command": "create-jpa-entity",
+  "cwd": "/path/to/project",
+  "succeed": true,
+  "data": {
+    "fileType": "User",
+    "filePackageName": "com.example.entities",
+    "filePath": "/path/to/User.java"
+  }
+}
+```
+
+Error responses include `errorReason` instead of `data`:
+
+```json
+{
+  "command": "create-jpa-entity",
+  "cwd": "/path/to/project",
+  "succeed": false,
+  "errorReason": "Package name is invalid"
+}
+```
+
+#### Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Frontend (Neovim, VSCode, CLI)                              │
+│  - Spawns process with args                                 │
+│  - Captures stdout JSON                                     │
+│  - Parses response and updates UI                           │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Clap CLI Parser                                             │
+│  - Validates arguments                                      │
+│  - Routes to appropriate handler                            │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+┌──────────────────────┐  ┌──────────────────────┐
+│ Interactive UI       │  │ Programmatic CLI     │
+│ (--features ui)      │  │ (Default)            │
+│                      │  │                      │
+│ - TUI forms          │  │ - Direct execution   │
+│ - User interaction   │  │ - All args provided  │
+│ - Calls commands     │  │ - Calls commands     │
+└──────────┬───────────┘  └──────────┬───────────┘
+           │                         │
+           └──────────┬──────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Command Layer          │
+           │  - Builds Response<T>  │
+           │  - Owns command names  │
+           │  - Validates inputs    │
+           └──────────┬─────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Service Layer          │
+           │  - Business logic      │
+           │  - File operations     │
+           │  - Tree-sitter parsing │
+           │  - Returns domain objs │
+           └────────────────────────┘
+```
+
+#### Key Design Decisions
+
+1. **Stateless Execution**: Each invocation is independent; no session state maintained
+2. **Single Source of Truth**: Commands build `Response<T>` objects, eliminating duplication
+3. **UI-Agnostic Services**: Business logic is pure; UI concerns handled separately
+4. **Consistent API**: Both CLI and TUI paths output identical JSON responses
+5. **Clean Separation**: Services → Commands → UI/CLI forms a clear dependency hierarchy
 
 <div align="center">
   <img width="500" alt="syntaxpresso-archtecture" src="https://github.com/user-attachments/assets/ddd3cd2d-3f03-4bbf-b855-8fc17248b3c2" />
@@ -135,12 +319,19 @@ src/
 ├── commands/           # CLI command implementations
 │   ├── services/       # Business logic services
 │   └── validators/     # Input validation
+├── ui/                 # Terminal UI (optional, requires 'ui' feature)
+│   ├── forms/          # Interactive form implementations
+│   └── widgets.rs      # Reusable UI components
 ├── common/
 │   ├── services/       # Shared services (annotations, imports, etc.)
 │   ├── types/          # Type definitions and configurations
 │   └── utils/          # Utility functions
 └── responses/          # Response type definitions
 ```
+
+### Feature Flags
+
+- `ui` - Enables the interactive Terminal UI commands (adds ~600KB to binary size)
 
 ### Prerequisites
 
@@ -149,8 +340,16 @@ src/
 
 ### Building
 
+**CLI-only:**
+
 ```bash
 cargo build
+```
+
+**With UI:**
+
+```bash
+cargo build --features ui
 ```
 
 ### Testing
@@ -158,6 +357,92 @@ cargo build
 ```bash
 cargo test
 ```
+
+### Local Development Setup
+
+#### Neovim Plugin Development
+
+To develop and test the Neovim plugin with a local build of syntaxpresso-core:
+
+1. **Build the core with UI support:**
+
+   ```bash
+   cd core
+   cargo build --release --features ui
+   ```
+
+2. **Configure the plugin to use your local build:**
+
+   Add this to your Neovim plugin configuration (e.g., using lazy.nvim):
+
+   ```lua
+   {
+     "syntaxpresso/syntaxpresso.nvim",
+     dir = "/path/to/your/syntaxpresso/syntaxpresso.nvim",
+     config = function()
+       require("syntaxpresso").setup({
+         executable_path = "/path/to/your/syntaxpresso/core/target/release/syntaxpresso-core",
+       })
+     end,
+     dependencies = {
+       "grapp-dev/nui-components.nvim",
+       "MunifTanjim/nui.nvim",
+       "nvimtools/none-ls.nvim",
+     },
+   }
+   ```
+
+3. **Restart Neovim** and the plugin will use your local development build.
+
+````
+
+#### Standalone UI Testing
+
+You can test the interactive UI forms without Neovim:
+
+1. **Build with UI features:**
+
+   ```bash
+   cd core
+   cargo build --release --features ui
+````
+
+2. **Run UI commands directly from terminal:**
+
+   ```bash
+   # Test Java file creation form
+   ./target/release/syntaxpresso-core ui create-java-file --cwd /path/to/java/project
+
+   # Test JPA entity creation form
+   ./target/release/syntaxpresso-core ui create-jpa-entity --cwd /path/to/java/project
+
+   # Test entity field creation form (requires entity file)
+   ./target/release/syntaxpresso-core ui create-jpa-entity-basic-field \
+     --cwd /path/to/java/project \
+     --entity-file-path /path/to/User.java \
+     --entity-file-b64-src $(base64 -w 0 /path/to/User.java)
+
+   # Test JPA repository creation form (requires entity file)
+   ./target/release/syntaxpresso-core ui create-jpa-repository \
+     --cwd /path/to/java/project \
+     --entity-file-path /path/to/User.java \
+     --entity-file-b64-src $(base64 -w 0 /path/to/User.java)
+   ```
+
+3. **Interact with forms using keyboard:**
+   - `Tab` / `Shift+Tab` - Navigate between fields
+   - `Enter` - Select/confirm
+   - `Esc` - Cancel
+   - `i` - Enter insert mode (for text fields)
+   - `a` - Enter insert mode at end of text
+   - Arrow keys - Navigate lists and autocomplete
+
+This approach is useful for:
+
+- Testing UI changes without restarting Neovim
+- Debugging TUI form behavior in isolation
+- Developing new interactive commands
+- UI/UX iteration and design validation
 
 ## Contributing
 
