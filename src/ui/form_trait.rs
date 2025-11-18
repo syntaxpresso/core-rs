@@ -163,7 +163,9 @@ pub trait FormBehavior {
       return false;
     }
     // Handle C-c
-    if let KeyCode::Char('c') = key && self.input_mode() == InputMode::Insert {
+    if let KeyCode::Char('c') = key
+      && self.input_mode() == InputMode::Insert
+    {
       self.set_input_mode(InputMode::Normal);
       self.escape_handler_mut().reset();
       return false;
@@ -243,8 +245,37 @@ pub trait FormBehavior {
 pub mod helpers {
   use crossterm::event::KeyCode;
   use ratatui::widgets::ListState;
+  use serde::Serialize;
 
-  use super::InputMode;
+  use super::{FormState, InputMode};
+  use crate::responses::response::Response;
+
+  /// Output a Response<T> as JSON and exit the process
+  ///
+  /// This helper function standardizes how UI forms handle command responses:
+  /// - Prints JSON to stdout for the frontend to parse
+  /// - Exits with code 0 on success, 1 on error
+  /// - Updates form state error message on failure
+  ///
+  /// # Arguments
+  /// * `response` - The Response<T> object from a command
+  /// * `form_state` - Mutable reference to the form's state
+  pub fn output_response_and_exit<T: Serialize>(response: Response<T>, form_state: &mut FormState) {
+    // Output JSON to stdout
+    if let Ok(json) = response.to_json() {
+      println!("{}", json);
+    }
+
+    // Handle success vs error
+    if response.is_success() {
+      form_state.should_quit = true;
+      std::process::exit(0);
+    } else {
+      // Set error message and exit with error code
+      form_state.error_message = response.get_error().cloned();
+      std::process::exit(1);
+    }
+  }
 
   /// Navigate a list - standalone function
   pub fn navigate_list_static(key: &KeyCode, state: &mut ListState, len: usize) {
