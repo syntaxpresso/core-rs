@@ -291,14 +291,16 @@ impl TSFile {
   ///
   /// # Examples
   /// ```
-  /// use std::path::Path;
   /// use syntaxpresso_core::common::ts_file::TSFile;
   ///
   /// # fn main() -> std::io::Result<()> {
   /// let mut ts_file = TSFile::from_source_code("public class Example {}");
-  /// let existing_file = Path::new("/home/user/project/Example.java");
+  /// 
+  /// // Use system temp directory for portability
+  /// let temp_dir = std::env::temp_dir();
+  /// let existing_file = temp_dir.join("Example.java");
   ///
-  /// ts_file.save_to_existing_file(existing_file)?;
+  /// ts_file.save_to_existing_file(&existing_file)?;
   /// # Ok(())
   /// # }
   /// ```
