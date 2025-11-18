@@ -16,9 +16,37 @@ A standalone Rust-based CLI backend for IDE plugins that provides advanced Java 
 
 Syntaxpresso Core is designed as a backend service for IDE plugins, offering comprehensive Java code generation and manipulation through a CLI interface. The tool specializes in JPA (Java Persistence API) entity management, providing developers with automated code generation for complex Java persistence scenarios.
 
+## Binary Variants
+
+Syntaxpresso Core is available in two variants:
+
+### CLI-only (Default)
+- Smaller binary size (~3.4MB)
+- Command-line interface with JSON output
+- Designed for IDE plugin integration
+- Binary names: `syntaxpresso-core-{platform}-{arch}`
+
+### UI-enabled
+- Includes interactive Terminal UI (TUI) for visual code generation
+- Built with the `ui` feature flag
+- Larger binary size (~4.0MB) due to UI dependencies
+- Binary names: `syntaxpresso-core-ui-{platform}-{arch}`
+
+### Choosing a Variant
+
+**Use CLI-only if:**
+- You're integrating with an IDE plugin (Neovim, VSCode, etc.)
+- You need JSON output for programmatic consumption
+- You want the smallest binary size
+
+**Use UI-enabled if:**
+- You want an interactive terminal interface for code generation
+- You prefer visual forms over command-line arguments
+- You're using it as a standalone tool
+
 ## Features
 
-### Available Commands
+### Available Commands (CLI)
 
 #### Entity Management
 
@@ -44,6 +72,58 @@ Syntaxpresso Core is designed as a backend service for IDE plugins, offering com
 
 - **`create-jpa-repository`**: Generate Spring Data JPA repository interfaces
 - **`create-java-file`**: Create basic Java files (classes, interfaces, enums)
+
+### UI Commands (UI-enabled binary only)
+
+The UI-enabled binary includes interactive terminal forms for:
+
+- **`ui java-file`**: Interactive form to create Java files
+- **`ui jpa-entity`**: Interactive form to create JPA entities
+- **`ui entity-field`**: Interactive form to add fields to entities
+- **`ui entity-relationship`**: Interactive form to create entity relationships
+
+```bash
+# Launch interactive UI for creating a Java file
+./syntaxpresso-core ui java-file --cwd /path/to/project
+
+# Launch UI to add a field to an entity
+./syntaxpresso-core ui entity-field \
+  --cwd /path/to/project \
+  --entity-file-path /path/to/User.java \
+  --entity-file-b64-src <base64-encoded-source>
+```
+
+## Installation
+
+### From GitHub Releases
+
+Download the appropriate binary for your platform from the [Releases page](https://github.com/syntaxpresso/core/releases):
+
+**CLI-only binaries:**
+- `syntaxpresso-core-linux-amd64` - Linux x86_64
+- `syntaxpresso-core-macos-amd64` - macOS Intel
+- `syntaxpresso-core-macos-arm64` - macOS Apple Silicon
+- `syntaxpresso-core-windows-amd64.exe` - Windows x86_64
+
+**UI-enabled binaries:**
+- `syntaxpresso-core-ui-linux-amd64` - Linux x86_64
+- `syntaxpresso-core-ui-macos-amd64` - macOS Intel
+- `syntaxpresso-core-ui-macos-arm64` - macOS Apple Silicon
+- `syntaxpresso-core-ui-windows-amd64.exe` - Windows x86_64
+
+### Building from Source
+
+**CLI-only:**
+```bash
+cargo build --release
+```
+
+**UI-enabled:**
+```bash
+cargo build --release --features ui
+```
+
+The binary will be available at `target/release/syntaxpresso-core`.
 
 ## Usage
 
@@ -135,12 +215,19 @@ src/
 ├── commands/           # CLI command implementations
 │   ├── services/       # Business logic services
 │   └── validators/     # Input validation
+├── ui/                 # Terminal UI (optional, requires 'ui' feature)
+│   ├── forms/          # Interactive form implementations
+│   └── widgets.rs      # Reusable UI components
 ├── common/
 │   ├── services/       # Shared services (annotations, imports, etc.)
 │   ├── types/          # Type definitions and configurations
 │   └── utils/          # Utility functions
 └── responses/          # Response type definitions
 ```
+
+### Feature Flags
+
+- `ui` - Enables the interactive Terminal UI commands (adds ~600KB to binary size)
 
 ### Prerequisites
 
@@ -149,8 +236,14 @@ src/
 
 ### Building
 
+**CLI-only:**
 ```bash
 cargo build
+```
+
+**With UI:**
+```bash
+cargo build --features ui
 ```
 
 ### Testing
