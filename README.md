@@ -194,13 +194,99 @@ Error responses follow this format:
 
 ### Architecture
 
-Communication follows a **unidirectional request-response model** handled via standard input/output (stdio). The syntaxpresso-core is a stateless CLI application that only prints a single JSON response to stdout before exiting; it never sends commands back to the IDE.
+Syntaxpresso Core follows a **dual-interface architecture** supporting both programmatic CLI access and interactive TUI, with a unidirectional request-response model.
 
-- Request (IDE to Core): The IDE plugin spawns the compiled syntaxpresso-core binary as a new process for each request.
-- All required information (the command, file paths, options) is passed as CLI arguments at spawn time.
-- Execution (Core): The Rust application parses the arguments, executes the requested command, and performs all logic internally.
-- Response (Core to IDE): Upon completion, the Rust core serializes a standard Response object into a single JSON string and prints it to stdout.
-- Result (IDE): The IDE plugin captures this stdout, parses the JSON, and uses the structured data (e.g., file paths, success status, or error details) to update its state. The Rust process then terminates.
+#### Communication Model
+
+The core is a stateless CLI application that processes one request per invocation and outputs a single JSON response to stdout before exiting.
+
+**Request Flow:**
+1. **IDE/Frontend to Core**: Spawns the binary as a new process with CLI arguments
+2. **Routing**: Clap parses arguments and routes to either:
+   - **Programmatic Path**: Direct command execution → Service layer → JSON response
+   - **Interactive Path** (UI-enabled only): TUI form → User input → Command layer → Service layer → JSON response
+3. **Execution**: Command layer calls service layer for business logic
+4. **Response**: Command layer builds standardized `Response<T>` object
+5. **Output**: Serializes response to JSON and prints to stdout
+6. **Termination**: Process exits with status code (0 = success, 1 = error)
+
+**Response Format:**
+```json
+{
+  "command": "create-jpa-entity",
+  "cwd": "/path/to/project",
+  "succeed": true,
+  "data": {
+    "fileType": "User",
+    "filePackageName": "com.example.entities",
+    "filePath": "/path/to/User.java"
+  }
+}
+```
+
+Error responses include `errorReason` instead of `data`:
+```json
+{
+  "command": "create-jpa-entity",
+  "cwd": "/path/to/project",
+  "succeed": false,
+  "errorReason": "Package name is invalid"
+}
+```
+
+#### Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Frontend (Neovim, VSCode, CLI)                              │
+│  - Spawns process with args                                 │
+│  - Captures stdout JSON                                     │
+│  - Parses response and updates UI                           │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Clap CLI Parser                                             │
+│  - Validates arguments                                      │
+│  - Routes to appropriate handler                            │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+┌──────────────────────┐  ┌──────────────────────┐
+│ Interactive UI       │  │ Programmatic CLI     │
+│ (--features ui)      │  │ (Default)            │
+│                      │  │                      │
+│ - TUI forms          │  │ - Direct execution   │
+│ - User interaction   │  │ - All args provided  │
+│ - Calls commands     │  │ - Calls commands     │
+└──────────┬───────────┘  └──────────┬───────────┘
+           │                         │
+           └──────────┬──────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Command Layer          │
+           │  - Builds Response<T>  │
+           │  - Owns command names  │
+           │  - Validates inputs    │
+           └──────────┬─────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Service Layer          │
+           │  - Business logic      │
+           │  - File operations     │
+           │  - Tree-sitter parsing │
+           │  - Returns domain objs │
+           └────────────────────────┘
+```
+
+#### Key Design Decisions
+
+1. **Stateless Execution**: Each invocation is independent; no session state maintained
+2. **Single Source of Truth**: Commands build `Response<T>` objects, eliminating duplication
+3. **UI-Agnostic Services**: Business logic is pure; UI concerns handled separately
+4. **Consistent API**: Both CLI and TUI paths output identical JSON responses
+5. **Clean Separation**: Services → Commands → UI/CLI forms a clear dependency hierarchy
 
 <div align="center">
   <img width="500" alt="syntaxpresso-archtecture" src="https://github.com/user-attachments/assets/ddd3cd2d-3f03-4bbf-b855-8fc17248b3c2" />
