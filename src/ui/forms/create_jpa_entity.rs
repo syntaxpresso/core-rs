@@ -7,8 +7,9 @@ use ratatui::{
 };
 use std::path::{Path, PathBuf};
 
-use crate::commands::services::create_jpa_entity_service;
-use crate::commands::{get_all_jpa_mapped_superclasses, get_all_packages_command};
+use crate::commands::{
+  create_jpa_entity_command, get_all_jpa_mapped_superclasses, get_all_packages_command,
+};
 use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
 use crate::ui::form_trait::{FormBehavior, FormState, InputMode, helpers};
 
@@ -173,7 +174,9 @@ impl CreateJpaEntityForm {
     self.filtered_packages = prefix_matches.into_iter().take(7).collect();
     self.show_package_autocomplete = !self.filtered_packages.is_empty();
 
-    if let Some(idx) = self.package_autocomplete_selected_index && idx >= self.filtered_packages.len() {
+    if let Some(idx) = self.package_autocomplete_selected_index
+      && idx >= self.filtered_packages.len()
+    {
       self.package_autocomplete_selected_index = None;
       self.package_autocomplete_scroll_offset = 0;
     }
@@ -412,25 +415,17 @@ impl CreateJpaEntityForm {
         (None, None)
       };
 
-    match create_jpa_entity_service::run(
+    // Call command layer instead of service directly
+    let response = create_jpa_entity_command::execute(
       &self.cwd,
       &self.package_name,
       &self.entity_name,
       superclass_type,
       superclass_package_name,
-    ) {
-      Ok(response) => {
-        eprintln!(
-          "Successfully created JPA Entity {} at {}",
-          response.file_type, response.file_path
-        );
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   fn render_entity_name_input(&mut self, frame: &mut Frame, area: Rect) {

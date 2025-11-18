@@ -9,8 +9,7 @@ use ratatui::{
 };
 use std::path::{Path, PathBuf};
 
-use crate::commands::get_java_files_command;
-use crate::commands::services::create_jpa_entity_enum_field_service;
+use crate::commands::{create_jpa_entity_enum_field_command, get_java_files_command};
 use crate::common::types::enum_field_config::EnumFieldConfig;
 use crate::common::types::java_enum_type::JavaEnumType;
 use crate::common::types::java_file_type::JavaFileType;
@@ -169,7 +168,9 @@ impl CreateEnumFieldForm {
 
   /// Update enum type and related values
   fn update_enum_type(&mut self) {
-    if let Some(idx) = self.enum_type_state.selected() && let Some(enum_info) = self.all_enum_types.get(idx) {
+    if let Some(idx) = self.enum_type_state.selected()
+      && let Some(enum_info) = self.all_enum_types.get(idx)
+    {
       self.enum_type_index = idx;
       self.enum_type = enum_info.file_type.clone();
       self.enum_package_name = enum_info.file_package_name.clone();
@@ -473,25 +474,16 @@ impl CreateEnumFieldForm {
       field_unique: self.unique,
     };
 
-    // Call service
-    match create_jpa_entity_enum_field_service::run(
+    // Call command layer instead of service directly
+    let response = create_jpa_entity_enum_field_command::execute(
       &self.cwd,
       &self.entity_file_b64_src,
       &self.entity_file_path,
       field_config,
-    ) {
-      Ok(response) => {
-        eprintln!(
-          "Successfully created enum field {} in {} at {}",
-          self.field_name, response.file_type, response.file_path
-        );
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   fn render_enum_type_selector(&mut self, frame: &mut Frame, area: Rect) {

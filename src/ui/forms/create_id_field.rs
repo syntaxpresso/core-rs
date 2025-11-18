@@ -10,8 +10,9 @@ use ratatui::{
 };
 use std::path::{Path, PathBuf};
 
-use crate::commands::services::create_jpa_entity_id_field_service;
-use crate::commands::{get_java_basic_types_command, get_jpa_entity_info_command};
+use crate::commands::{
+  create_jpa_entity_id_field_command, get_java_basic_types_command, get_jpa_entity_info_command,
+};
 use crate::common::types::id_field_config::IdFieldConfig;
 use crate::common::types::java_basic_types::JavaBasicType;
 use crate::common::types::java_id_generation::JavaIdGeneration;
@@ -282,8 +283,7 @@ impl CreateIdFieldForm {
     cwd: &Path,
     entity_file_path: &Path,
   ) -> Result<(Option<String>, String), Box<dyn std::error::Error>> {
-    let response =
-      get_jpa_entity_info_command::execute(cwd, Some(entity_file_path), None);
+    let response = get_jpa_entity_info_command::execute(cwd, Some(entity_file_path), None);
 
     if let Some(data) = response.data {
       Ok((data.entity_table_name, data.entity_type))
@@ -294,7 +294,9 @@ impl CreateIdFieldForm {
 
   /// Update field type and related visibility flags
   fn update_field_type(&mut self) {
-    if let Some(idx) = self.field_type_state.selected() && let Some(type_info) = self.all_id_types.get(idx) {
+    if let Some(idx) = self.field_type_state.selected()
+      && let Some(type_info) = self.all_id_types.get(idx)
+    {
       self.field_type_index = idx;
       self.field_type = type_info.name.clone();
       self.field_package_path = type_info.package_path.clone();
@@ -727,25 +729,16 @@ impl CreateIdFieldForm {
       field_nullable: !self.mandatory,
     };
 
-    // Call service
-    match create_jpa_entity_id_field_service::run(
+    // Call command layer instead of service directly
+    let response = create_jpa_entity_id_field_command::execute(
       &self.cwd,
       &self.entity_file_b64_src,
       &self.entity_file_path,
       field_config,
-    ) {
-      Ok(response) => {
-        eprintln!(
-          "Successfully created ID field {} in {} at {}",
-          self.field_name, response.file_type, response.file_path
-        );
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   fn render_title_bar(&self, frame: &mut Frame, area: Rect) {

@@ -10,8 +10,7 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
-use crate::commands::get_java_basic_types_command;
-use crate::commands::services::create_jpa_entity_basic_field_service;
+use crate::commands::{create_jpa_entity_basic_field_command, get_java_basic_types_command};
 use crate::common::types::basic_field_config::BasicFieldConfig;
 use crate::common::types::java_basic_types::JavaBasicType;
 use crate::common::types::java_field_temporal::JavaFieldTemporal;
@@ -291,7 +290,9 @@ impl CreateBasicFieldForm {
 
   /// Update field type and related visibility flags
   fn update_field_type(&mut self) {
-    if let Some(idx) = self.field_type_state.selected() && let Some(type_info) = self.all_types.get(idx) {
+    if let Some(idx) = self.field_type_state.selected()
+      && let Some(type_info) = self.all_types.get(idx)
+    {
       self.field_type_index = idx;
       self.field_type = type_info.name.clone();
       self.field_package_path = type_info.package_path.clone();
@@ -299,8 +300,8 @@ impl CreateBasicFieldForm {
       // Update visibility based on type
       let type_id = &type_info.id;
 
-        self.field_length_hidden = !self.types_with_length.contains(type_id);
-        self.field_time_zone_storage_hidden = !self.types_with_time_zone_storage.contains(type_id);
+      self.field_length_hidden = !self.types_with_length.contains(type_id);
+      self.field_time_zone_storage_hidden = !self.types_with_time_zone_storage.contains(type_id);
       self.field_temporal_hidden = !self.types_with_temporal.contains(type_id);
 
       if self.types_with_extra_other.contains(type_id) {
@@ -683,24 +684,16 @@ impl CreateBasicFieldForm {
       field_large_object: self.large_object,
     };
 
-    // Call service
-    match create_jpa_entity_basic_field_service::run(
+    // Call command layer instead of service directly
+    let response = create_jpa_entity_basic_field_command::execute(
+      &self.cwd,
       &self.entity_file_b64_src,
       &self.entity_file_path,
       &field_config,
-    ) {
-      Ok(response) => {
-        eprintln!(
-          "Successfully created field {} in {} at {}",
-          self.field_name, response.file_type, response.file_path
-        );
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   fn render_field_type_selector(&mut self, frame: &mut Frame, area: Rect) {

@@ -40,7 +40,9 @@ fn run_app<B: ratatui::backend::Backend, F: FormBehavior>(
   loop {
     terminal.draw(|f| app.render(f))?;
 
-    if let Event::Key(key) = event::read()? && key.kind == KeyEventKind::Press {
+    if let Event::Key(key) = event::read()?
+      && key.kind == KeyEventKind::Press
+    {
       if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
         if app.handle_input(KeyCode::Char('c')) {
           return Ok(());
