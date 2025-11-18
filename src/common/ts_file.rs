@@ -295,7 +295,7 @@ impl TSFile {
   ///
   /// # fn main() -> std::io::Result<()> {
   /// let mut ts_file = TSFile::from_source_code("public class Example {}");
-  /// 
+  ///
   /// // Use system temp directory for portability
   /// let temp_dir = std::env::temp_dir();
   /// let existing_file = temp_dir.join("Example.java");
