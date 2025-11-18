@@ -179,7 +179,6 @@ fn add_relationship_field_and_annotations(
   let public_class_node = get_public_class_node(ts_file)
     .ok_or_else(|| "Unable to get JPA Entity's public class node".to_string())?;
   let public_class_node_start_byte = public_class_node.start_byte();
-  let target_field_name_snake_case = case_util::auto_convert_case(field_name, CaseType::Snake);
   let field_type = if annotation_config.is_owning_side {
     target_entity_type.to_string()
   } else {
@@ -194,7 +193,7 @@ fn add_relationship_field_and_annotations(
     visibility_modifier: JavaVisibilityModifier::Private,
     field_modifiers: vec![],
     field_type: &field_type,
-    field_name: &target_field_name_snake_case,
+    field_name,
     field_initialization: None,
   };
   add_field_declaration(ts_file, public_class_node_start_byte, params, |builder| {
@@ -221,12 +220,7 @@ fn add_relationship_field_and_annotations(
     } else {
       builder.add_annotation("@OneToMany")?;
       if let Some(ref mapped_by_field) = annotation_config.mapped_by_field {
-        let mapped_by_snake_case = case_util::auto_convert_case(mapped_by_field, CaseType::Snake);
-        builder.with_argument(
-          "@OneToMany",
-          "mappedBy",
-          &format!("\"{}\"", mapped_by_snake_case),
-        )?;
+        builder.with_argument("@OneToMany", "mappedBy", &format!("\"{}\"", mapped_by_field))?;
       }
       if let Some(cascade_param) = build_cascade_param(&annotation_config.cascades) {
         builder.with_argument("@OneToMany", "cascade", &cascade_param)?;
@@ -237,7 +231,8 @@ fn add_relationship_field_and_annotations(
     }
     if annotation_config.needs_join_column {
       builder.add_annotation("@JoinColumn")?;
-      let column_name = format!("{}_id", target_field_name_snake_case);
+      let column_name_snake_case = case_util::auto_convert_case(field_name, CaseType::Snake);
+      let column_name = format!("{}_id", column_name_snake_case);
       builder.with_argument("@JoinColumn", "name", &format!("\"{}\"", column_name))?;
       let is_mandatory = annotation_config.other_options.contains(&OtherType::Mandatory);
       if is_mandatory {
