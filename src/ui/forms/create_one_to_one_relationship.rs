@@ -9,10 +9,8 @@ use ratatui::{
 };
 use std::path::{Path, PathBuf};
 
-use crate::commands::services::{
-  create_jpa_one_to_one_relationship_service, get_all_jpa_entities_service,
-  get_jpa_entity_info_service,
-};
+use crate::commands::create_jpa_one_to_one_relationship_command;
+use crate::commands::services::{get_all_jpa_entities_service, get_jpa_entity_info_service};
 use crate::common::types::cascade_type::CascadeType;
 use crate::common::types::mapping_type::MappingType;
 use crate::common::types::one_to_one_field_config::OneToOneFieldConfig;
@@ -232,7 +230,10 @@ impl CreateOneToOneRelationshipForm {
   fn parse_entity_files(json_str: &str) -> Vec<EntityTypeInfo> {
     let mut entity_types = Vec::new();
 
-    if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_str) && let Some(data) = json.get("data") && let Some(files) = data.get("files").and_then(|f| f.as_array()) {
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_str)
+      && let Some(data) = json.get("data")
+      && let Some(files) = data.get("files").and_then(|f| f.as_array())
+    {
       for file in files {
         if let (Some(file_type), Some(package_name)) = (
           file.get("fileType").and_then(|t| t.as_str()),
@@ -646,30 +647,18 @@ impl CreateOneToOneRelationshipForm {
       inverse_side_other: Self::get_other_types(&self.inverse_other, false),
     };
 
-    // Call service
-    match create_jpa_one_to_one_relationship_service::run(
+    // Call command layer instead of service directly
+    let response = create_jpa_one_to_one_relationship_command::execute(
       &self.cwd,
       &self.entity_file_b64_src,
       &self.entity_file_path,
-      &self.owning_field_name,
-      &self.inverse_field_name,
-      &field_config,
-    ) {
-      Ok(responses) => {
-        eprintln!("Successfully created one-to-one relationship in {} file(s)", responses.len());
-        for response in responses {
-          eprintln!(
-            "  - {} in {} at {}",
-            response.file_type, response.file_package_name, response.file_path
-          );
-        }
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+      self.owning_field_name.clone(),
+      self.inverse_field_name.clone(),
+      field_config,
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   /// Check if user wants to go back

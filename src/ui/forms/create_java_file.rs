@@ -8,8 +8,7 @@ use ratatui::{
 };
 use std::path::{Path, PathBuf};
 
-use crate::commands::get_all_packages_command;
-use crate::commands::services::create_java_file_service;
+use crate::commands::{create_java_file_command, get_all_packages_command};
 use crate::common::types::{
   java_file_type::JavaFileType, java_source_directory_type::JavaSourceDirectoryType,
 };
@@ -157,7 +156,9 @@ impl CreateJavaFileForm {
     self.show_autocomplete = !self.filtered_packages.is_empty();
 
     // Reset selection and scroll if out of bounds
-    if let Some(idx) = self.autocomplete_selected_index && idx >= self.filtered_packages.len() {
+    if let Some(idx) = self.autocomplete_selected_index
+      && idx >= self.filtered_packages.len()
+    {
       self.autocomplete_selected_index = None;
       self.autocomplete_scroll_offset = 0;
     }
@@ -397,26 +398,17 @@ impl CreateJavaFileForm {
   }
 
   fn execute_create_java_file(&mut self) {
-    // Call service directly with enum types - always use Main source directory
-    match create_java_file_service::run(
+    // Call command layer instead of service directly
+    let response = create_java_file_command::execute(
       &self.cwd,
       &self.package_name,
       &self.file_name,
       &self.file_type,
       &JavaSourceDirectoryType::Main,
-    ) {
-      Ok(response) => {
-        // Success! Print result to stderr (stdout reserved for TUI)
-        eprintln!("Successfully created {} at {}", response.file_type, response.file_path);
-        // Signal quit and exit with success code
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        // Show error in UI instead of quitting
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   fn render_file_type_selector(&mut self, frame: &mut Frame, area: Rect) {

@@ -9,10 +9,8 @@ use ratatui::{
 };
 use std::path::{Path, PathBuf};
 
-use crate::commands::services::{
-  create_jpa_many_to_one_relationship_service, get_all_jpa_entities_service,
-  get_jpa_entity_info_service,
-};
+use crate::commands::create_jpa_many_to_one_relationship_command;
+use crate::commands::services::{get_all_jpa_entities_service, get_jpa_entity_info_service};
 use crate::common::types::cascade_type::CascadeType;
 use crate::common::types::collection_type::CollectionType;
 use crate::common::types::fetch_type::FetchType;
@@ -557,30 +555,18 @@ impl CreateManyToOneRelationshipForm {
       inverse_side_other: Self::get_other_types(&self.inverse_other, false),
     };
 
-    // Call service
-    match create_jpa_many_to_one_relationship_service::run(
+    // Call command layer instead of service directly
+    let response = create_jpa_many_to_one_relationship_command::execute(
       &self.cwd,
       &self.entity_file_b64_src,
       &self.entity_file_path,
-      &self.owning_field_name,
-      &self.inverse_field_name,
-      &field_config,
-    ) {
-      Ok(responses) => {
-        eprintln!("Successfully created many-to-one relationship in {} file(s)", responses.len());
-        for response in responses {
-          eprintln!(
-            "  - {} in {} at {}",
-            response.file_type, response.file_package_name, response.file_path
-          );
-        }
-        self.state.should_quit = true;
-        std::process::exit(0);
-      }
-      Err(e) => {
-        self.state.error_message = Some(format!("Error: {}", e));
-      }
-    }
+      self.owning_field_name.clone(),
+      self.inverse_field_name.clone(),
+      field_config,
+    );
+
+    // Use helper function to output response and exit
+    helpers::output_response_and_exit(response, &mut self.state);
   }
 
   /// Handle field-specific input in Insert mode

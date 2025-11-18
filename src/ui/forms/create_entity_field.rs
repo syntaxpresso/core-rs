@@ -372,7 +372,10 @@ impl FormBehavior for CreateEntityFieldForm {
     }
 
     // Handle Ctrl+Backspace (F2 signal) - not applicable for category selection (no back), delegate to child
-    if key == KeyCode::F(2) && self.phase == FormPhase::ChildForm && let Some(ref mut child) = self.child_form {
+    if key == KeyCode::F(2)
+      && self.phase == FormPhase::ChildForm
+      && let Some(ref mut child) = self.child_form
+    {
       let result = match child {
         ChildFormType::Basic(form) => form.handle_input(key),
         ChildFormType::Enum(form) => form.handle_input(key),
@@ -409,7 +412,9 @@ impl FormBehavior for CreateEntityFieldForm {
     }
 
     // Handle C-c
-    if let KeyCode::Char('c') = key && self.input_mode() == InputMode::Insert {
+    if let KeyCode::Char('c') = key
+      && self.input_mode() == InputMode::Insert
+    {
       self.set_input_mode(InputMode::Normal);
       self.escape_handler_mut().reset();
       return false;

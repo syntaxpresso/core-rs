@@ -385,7 +385,10 @@ impl FormBehavior for CreateEntityRelationshipForm {
     }
 
     // Handle Ctrl+Backspace (F2 signal)
-    if key == KeyCode::F(2) && self.phase == FormPhase::ChildForm && let Some(ref mut child) = self.child_form {
+    if key == KeyCode::F(2)
+      && self.phase == FormPhase::ChildForm
+      && let Some(ref mut child) = self.child_form
+    {
       return match child {
         ChildFormType::OneToOne(form) => form.handle_input(key),
         ChildFormType::ManyToOne(form) => form.handle_input(key),
@@ -416,7 +419,9 @@ impl FormBehavior for CreateEntityRelationshipForm {
     }
 
     // Handle C-c
-    if let KeyCode::Char('c') = key && self.input_mode() == InputMode::Insert {
+    if let KeyCode::Char('c') = key
+      && self.input_mode() == InputMode::Insert
+    {
       self.set_input_mode(InputMode::Normal);
       self.escape_handler_mut().reset();
       return false;
