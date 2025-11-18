@@ -10,7 +10,7 @@ use crate::common::services::class_declaration_service::{
   get_class_declaration_name_node, get_class_superclass_name_node,
 };
 use crate::common::services::package_declaration_service::{
-  get_package_class_scope_node, get_package_declaration_node,
+  get_package_declaration_node, get_package_scope_node,
 };
 use crate::common::services::{
   annotation_service, class_declaration_service, field_declaration_service,
@@ -64,7 +64,7 @@ fn extract_entity_package_scope(ts_file: &TSFile) -> Result<String, String> {
     return Err("Unable to get package declaration node".to_string());
   }
   let package_declaration_node = package_declaration_node_option.unwrap();
-  let package_scope_node_option = get_package_class_scope_node(ts_file, package_declaration_node);
+  let package_scope_node_option = get_package_scope_node(ts_file, package_declaration_node);
   if package_scope_node_option.is_none() {
     return Err("Unable to get package scope".to_string());
   }

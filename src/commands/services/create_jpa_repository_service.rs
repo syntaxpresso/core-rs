@@ -17,7 +17,11 @@ use crate::responses::create_jpa_repository_response::CreateJPARepositoryRespons
 use crate::responses::file_response::FileResponse;
 use crate::responses::get_jpa_entity_info_response::GetJpaEntityInfoResponse;
 
-fn create_repository_file(cwd: &Path, entity_ts_file: &TSFile) -> Result<FileResponse, String> {
+fn create_repository_file(
+  cwd: &Path,
+  entity_ts_file: &TSFile,
+  entity_file_path: &Path,
+) -> Result<FileResponse, String> {
   let entity_package_declaration_node = get_package_declaration_node(entity_ts_file);
   if entity_package_declaration_node.is_none() {
     return Err("Unable to get JPA Entity package declaration node".to_string());
@@ -31,10 +35,14 @@ fn create_repository_file(cwd: &Path, entity_ts_file: &TSFile) -> Result<FileRes
     .get_text_from_node(&entity_package_scope_node.unwrap())
     .map(|package_name| package_name.to_string())
     .ok_or_else(|| "Unable to extract package name from package scope node".to_string())?;
-  let repository_file_name = entity_ts_file
-    .get_file_name_without_ext()
-    .map(|file_name| format!("{}Repository", file_name))
-    .ok_or_else(|| "Unable to get entity file name".to_string())?;
+
+  // Extract entity name from file path instead of TSFile (which may not have a path when created from base64)
+  let entity_name = entity_file_path
+    .file_stem()
+    .and_then(|s| s.to_str())
+    .ok_or_else(|| "Unable to get entity file name from path".to_string())?;
+
+  let repository_file_name = format!("{}Repository", entity_name);
   let repository_file_type = JavaFileType::Interface;
   let repository_source_dir_type = JavaSourceDirectoryType::Main;
   let create_java_file_response = create_java_file_service::run(
@@ -75,10 +83,12 @@ fn create_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
 fn create_and_extend_jpa_repository(
   cwd: &Path,
   entity_ts_file: &TSFile,
+  entity_file_path: &Path,
   entity_type: &str,
   jpa_entity_info: &GetJpaEntityInfoResponse,
 ) -> Result<TSFile, String> {
-  let create_repository_file_response = create_repository_file(cwd, entity_ts_file)?;
+  let create_repository_file_response =
+    create_repository_file(cwd, entity_ts_file, entity_file_path)?;
   let jpa_repository_path = PathBuf::from(&create_repository_file_response.file_path);
   let mut jpa_repository_ts_file = TSFile::from_file(jpa_repository_path.as_path())
     .map_err(|e| format!("Unable to parse newly created repository file: {}", e))?;
@@ -127,10 +137,6 @@ fn extend_jpa_repository(
   );
 }
 
-fn step_extract_entity_type(entity_ts_file: &TSFile) -> String {
-  entity_ts_file.get_file_name_without_ext().unwrap_or_else(|| "Unknown".to_string())
-}
-
 fn step_get_jpa_entity_info(
   entity_file_path: Option<&Path>,
   b64_source_code: Option<&str>,
@@ -141,6 +147,7 @@ fn step_get_jpa_entity_info(
 fn step_process_entity_without_superclass(
   cwd: &Path,
   entity_ts_file: &TSFile,
+  entity_file_path: &Path,
   entity_type: &str,
   jpa_entity_info: &GetJpaEntityInfoResponse,
 ) -> Result<CreateJPARepositoryResponse, String> {
@@ -148,7 +155,13 @@ fn step_process_entity_without_superclass(
     && jpa_entity_info.id_field_type.is_some()
     && jpa_entity_info.id_field_package_name.is_some()
   {
-    step_create_repository_and_save(cwd, entity_ts_file, entity_type, jpa_entity_info)
+    step_create_repository_and_save(
+      cwd,
+      entity_ts_file,
+      entity_file_path,
+      entity_type,
+      jpa_entity_info,
+    )
   } else {
     let superclass_type = jpa_entity_info.superclass_type.clone();
     let response = create_jpa_repository_response(false, superclass_type, None);
@@ -159,6 +172,7 @@ fn step_process_entity_without_superclass(
 fn step_process_entity_with_superclass(
   cwd: &Path,
   entity_ts_file: &TSFile,
+  entity_file_path: &Path,
   entity_type: &str,
   jpa_entity_info: &GetJpaEntityInfoResponse,
 ) -> Result<CreateJPARepositoryResponse, String> {
@@ -172,17 +186,29 @@ fn step_process_entity_with_superclass(
   if jpa_entity_info.id_field_type.is_none() || jpa_entity_info.id_field_package_name.is_none() {
     return Err("Unable to find ID field for this JPA Entity".to_string());
   }
-  step_create_repository_and_save(cwd, entity_ts_file, entity_type, jpa_entity_info)
+  step_create_repository_and_save(
+    cwd,
+    entity_ts_file,
+    entity_file_path,
+    entity_type,
+    jpa_entity_info,
+  )
 }
 
 fn step_create_repository_and_save(
   cwd: &Path,
   entity_ts_file: &TSFile,
+  entity_file_path: &Path,
   entity_type: &str,
   jpa_entity_info: &GetJpaEntityInfoResponse,
 ) -> Result<CreateJPARepositoryResponse, String> {
-  let mut jpa_repository_ts_file =
-    create_and_extend_jpa_repository(cwd, entity_ts_file, entity_type, jpa_entity_info)?;
+  let mut jpa_repository_ts_file = create_and_extend_jpa_repository(
+    cwd,
+    entity_ts_file,
+    entity_file_path,
+    entity_type,
+    jpa_entity_info,
+  )?;
   match jpa_repository_ts_file.save() {
     Ok(_) => {
       let file_response = create_file_response(&jpa_repository_ts_file)?;
@@ -193,6 +219,40 @@ fn step_create_repository_and_save(
   }
 }
 
+/// Creates a JPA repository with manually provided ID field information.
+/// This is used as a fallback when automatic ID field detection fails.
+pub fn run_with_manual_id(
+  cwd: &Path,
+  entity_file_b64_src: &str,
+  entity_file_path: &Path,
+  id_field_type: &str,
+  id_field_package_name: &str,
+) -> Result<FileResponse, String> {
+  // Step 1: Parse JPA Entity file
+  let entity_ts_file = TSFile::from_base64_source_code(entity_file_b64_src);
+  // Step 2: Extract entity type from file path
+  let entity_type = entity_file_path
+    .file_stem()
+    .and_then(|s| s.to_str())
+    .ok_or_else(|| "Unable to get entity file name from path".to_string())?;
+  // Step 3: Create repository file
+  let create_repository_file_response =
+    create_repository_file(cwd, &entity_ts_file, entity_file_path)?;
+  let jpa_repository_path = PathBuf::from(&create_repository_file_response.file_path);
+  // Step 4: Parse and extend repository file
+  let mut jpa_repository_ts_file = TSFile::from_file(jpa_repository_path.as_path())
+    .map_err(|e| format!("Unable to parse newly created repository file: {}", e))?;
+  extend_jpa_repository(
+    &mut jpa_repository_ts_file,
+    entity_type,
+    id_field_type,
+    id_field_package_name,
+  );
+  // Step 5: Save and return
+  jpa_repository_ts_file.save().map_err(|_| "Unable to save repository file".to_string())?;
+  create_file_response(&jpa_repository_ts_file)
+}
+
 pub fn run(
   cwd: &Path,
   entity_file_b64_src: &str,
@@ -201,17 +261,33 @@ pub fn run(
 ) -> Result<CreateJPARepositoryResponse, String> {
   // Step 1: Parse JPA Entity file
   let entity_ts_file = TSFile::from_base64_source_code(entity_file_b64_src);
-  // Step 2: Extract entity type from file name
-  let entity_type = step_extract_entity_type(&entity_ts_file);
+  // Step 2: Extract entity type from file path
+  let entity_type = entity_file_path
+    .file_stem()
+    .and_then(|s| s.to_str())
+    .ok_or_else(|| "Unable to get entity file name from path".to_string())?;
+
   if b64_superclass_source.is_none() {
     // Step 3: Get JPA entity info from entity file
     let jpa_entity_info = step_get_jpa_entity_info(Some(entity_file_path), None)?;
     // Step 4: Process entity without superclass
-    step_process_entity_without_superclass(cwd, &entity_ts_file, &entity_type, &jpa_entity_info)
+    step_process_entity_without_superclass(
+      cwd,
+      &entity_ts_file,
+      entity_file_path,
+      entity_type,
+      &jpa_entity_info,
+    )
   } else {
     // Step 3: Get JPA entity info from superclass source
     let jpa_entity_info = step_get_jpa_entity_info(None, b64_superclass_source)?;
     // Step 4: Process entity with superclass
-    step_process_entity_with_superclass(cwd, &entity_ts_file, &entity_type, &jpa_entity_info)
+    step_process_entity_with_superclass(
+      cwd,
+      &entity_ts_file,
+      entity_file_path,
+      entity_type,
+      &jpa_entity_info,
+    )
   }
 }

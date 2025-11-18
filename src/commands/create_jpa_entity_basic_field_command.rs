@@ -1,10 +1,7 @@
 use std::path::Path;
 
 use crate::{
-  commands::{
-    services::create_jpa_entity_basic_field_service::run,
-    validators::directory_validator::validate_file_path_within_base,
-  },
+  commands::services::create_jpa_entity_basic_field_service::run,
   common::types::basic_field_config::BasicFieldConfig,
   responses::{file_response::FileResponse, response::Response},
 };
@@ -17,17 +14,13 @@ pub fn execute(
 ) -> Response<FileResponse> {
   let cwd_string = cwd.display().to_string();
   let cmd_name = String::from("create-jpa-entity-basic-field");
-  // Security validation: ensure entity file path is within the cwd
-  let file_path_str = entity_file_path.display().to_string();
-  if let Err(error_msg) = validate_file_path_within_base(&file_path_str, cwd) {
-    return Response::error(
-      cmd_name,
-      cwd_string,
-      format!("Entity file path security validation failed: {}", error_msg),
-    );
-  }
 
-  match run(cwd, entity_file_b64_src, entity_file_path, field_config) {
+  // Note: We don't validate entity_file_path containment within cwd because
+  // we're editing an existing file that the user has opened, which may be
+  // located anywhere on the filesystem. The path is trusted as it comes from
+  // the user's editor context.
+
+  match run(entity_file_b64_src, entity_file_path, field_config) {
     Ok(response) => Response::success(cmd_name, cwd_string, response),
     Err(error_msg) => Response::error(cmd_name, cwd_string, error_msg),
   }

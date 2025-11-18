@@ -194,7 +194,6 @@ fn build_file_response(ts_file: &TSFile) -> Result<FileResponse, String> {
 }
 
 pub fn run(
-  cwd: &Path,
   entity_file_b64_src: &str,
   entity_file_path: &Path,
   field_config: &BasicFieldConfig,
@@ -210,9 +209,9 @@ pub fn run(
   add_field_and_annotations(&mut entity_ts_file, field_config, &processed_field_config)?;
   // Step 5: Add imports
   add_imports(&mut entity_ts_file, &import_map);
-  // Step 6: Save file
+  // Step 6: Save file (use save_to_existing_file since we're modifying an existing entity file)
   entity_ts_file
-    .save_as(entity_file_path, cwd)
+    .save_to_existing_file(entity_file_path)
     .map_err(|e| format!("Unable to save JPA Entity file: {}", e))?;
   // Step 7: Build and return response
   build_file_response(&entity_ts_file)

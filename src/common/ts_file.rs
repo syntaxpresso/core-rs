@@ -271,6 +271,57 @@ impl TSFile {
     Ok(())
   }
 
+  /// Save to an existing file path without security validation
+  ///
+  /// This method is intended for overwriting existing files that were passed in from external sources
+  /// (e.g., when editing a file opened by the user). It does NOT perform path traversal validation
+  /// and should only be used when the path comes from a trusted source.
+  ///
+  /// # Arguments
+  /// * `path` - The target file path to save to (must be absolute)
+  ///
+  /// # Returns
+  /// * `Ok(())` - If the file was successfully saved
+  /// * `Err(std::io::Error)` - If the file save fails
+  ///
+  /// # Safety Considerations
+  /// - This method bypasses security validation
+  /// - Only use for paths that come from trusted sources (e.g., user-opened files)
+  /// - The path should be absolute to avoid ambiguity
+  ///
+  /// # Examples
+  /// ```
+  /// use syntaxpresso_core::common::ts_file::TSFile;
+  ///
+  /// # fn main() -> std::io::Result<()> {
+  /// let mut ts_file = TSFile::from_source_code("public class Example {}");
+  ///
+  /// // Use system temp directory for portability
+  /// let temp_dir = std::env::temp_dir();
+  /// let existing_file = temp_dir.join("Example.java");
+  ///
+  /// ts_file.save_to_existing_file(&existing_file)?;
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub fn save_to_existing_file(&mut self, path: &Path) -> std::io::Result<()> {
+    // Validate that the path is absolute for safety
+    if !path.is_absolute() {
+      return Err(std::io::Error::other(format!(
+        "Path must be absolute when using save_to_existing_file: '{}'",
+        path.display()
+      )));
+    }
+    // Create parent directories if they don't exist
+    if let Some(parent) = path.parent() {
+      fs::create_dir_all(parent)?;
+    }
+    fs::write(path, &self.source_code)?;
+    self.file = Some(path.to_path_buf());
+    self.modified = false;
+    Ok(())
+  }
+
   /// Move file to new destination
   pub fn move_file(&mut self, destination: &Path) {
     self.new_path = Some(destination.to_path_buf());

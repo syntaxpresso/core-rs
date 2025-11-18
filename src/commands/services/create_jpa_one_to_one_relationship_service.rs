@@ -176,8 +176,6 @@ fn add_relationship_field_and_annotations(
     .ok_or_else(|| "Unable to get public class node from Entity".to_string())?;
   let public_class_node_start_byte = public_class_node.start_byte();
   let field_name_camel_case = case_util::auto_convert_case(field_name, CaseType::Camel);
-  let target_field_name_snake_case =
-    case_util::auto_convert_case(target_entity_type, CaseType::Snake);
   let params = AddFieldDeclarationParams {
     insertion_position: FieldInsertionPosition::EndOfClassBody,
     visibility_modifier: JavaVisibilityModifier::Private,
@@ -201,12 +199,13 @@ fn add_relationship_field_and_annotations(
       builder.with_argument("@OneToOne", "orphanRemoval", "true")?;
     }
     if let Some(ref mapped_by_field) = annotation_config.mapped_by_field {
-      let mapped_by_snake_case = case_util::auto_convert_case(mapped_by_field, CaseType::Snake);
-      builder.with_argument("@OneToOne", "mappedBy", &format!("\"{}\"", mapped_by_snake_case))?;
+      builder.with_argument("@OneToOne", "mappedBy", &format!("\"{}\"", mapped_by_field))?;
     }
     if annotation_config.needs_join_column {
       builder.add_annotation("@JoinColumn")?;
-      let column_name = format!("{}_id", target_field_name_snake_case);
+      let field_name_snake_case =
+        case_util::auto_convert_case(&field_name_camel_case, CaseType::Snake);
+      let column_name = format!("{}_id", field_name_snake_case);
       builder.with_argument("@JoinColumn", "name", &format!("\"{}\"", column_name))?;
       if is_mandatory {
         builder.with_argument("@JoinColumn", "nullable", "false")?;
