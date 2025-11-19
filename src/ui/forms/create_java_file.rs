@@ -69,8 +69,12 @@ impl CreateJavaFileForm {
     let mut file_type_state = ListState::default();
     file_type_state.select(Some(0));
 
-    let default_package =
-      package_list.first().cloned().unwrap_or_else(|| "com.example".to_string());
+    // Find the package with the smallest string length (shortest name)
+    let default_package = package_list
+      .iter()
+      .min_by_key(|pkg| pkg.len())
+      .cloned()
+      .unwrap_or_else(|| "com.example".to_string());
 
     Self {
       state: FormState::new(),
@@ -572,7 +576,7 @@ impl CreateJavaFileForm {
       .direction(Direction::Vertical)
       .constraints([
         Constraint::Length(2), // Title bar
-        Constraint::Length(6), // File type selector (4 types + 2 borders)
+        Constraint::Length(7), // File type selector (5 types + 2 borders)
         Constraint::Length(3), // File name input
         Constraint::Length(3), // Package name input
         Constraint::Min(3),    // Flexible space for autocomplete + errors
