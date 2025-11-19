@@ -174,7 +174,7 @@ impl CreateEntityFieldForm {
       .direction(Direction::Vertical)
       .constraints([
         Constraint::Length(2), // Title bar
-        Constraint::Length(7), // Category selector (3 items + 2 borders + padding)
+        Constraint::Length(5), // Category selector (3 items + 2 borders + padding)
         Constraint::Min(0),    // Flexible space for errors
         Constraint::Length(1), // Next button
       ])
