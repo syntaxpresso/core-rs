@@ -905,12 +905,18 @@ impl CreateOneToOneRelationshipForm {
     if self.is_bidirectional() {
       // Show Next button for bidirectional
       let is_next_focused = self.focused_field == FocusedField::NextButton;
-      let next_style = if is_next_focused {
-        Style::default().bg(Color::Green).fg(Color::Black).add_modifier(Modifier::BOLD)
+      let color = if self.state.escape_handler.pressed_once { Color::Red } else { Color::Green };
+      let text = if self.state.escape_handler.pressed_once {
+        "Press esc again to close or any key to return"
       } else {
-        Style::default().fg(Color::Green)
+        "Next ->"
       };
-      let next_button = Paragraph::new("[ Next -> ]")
+      let next_style = if is_next_focused {
+        Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
+      } else {
+        Style::default().fg(color)
+      };
+      let next_button = Paragraph::new(format!("[ {} ]", text))
         .alignment(Alignment::Center)
         .style(next_style)
         .block(Block::default().borders(Borders::empty()));
