@@ -267,11 +267,14 @@ impl CreateEnumFieldForm {
       FocusedField::BackButton => {
         if self.back_pressed_once {
           self.should_go_back = true;
+          self.back_pressed_once = false; // Reset after going back
         } else {
           self.back_pressed_once = true;
         }
       }
-      _ => {}
+      _ => {
+        self.back_pressed_once = false; // Reset if Enter pressed on other fields
+      }
     }
   }
 
@@ -763,19 +766,28 @@ impl FormBehavior for CreateEnumFieldForm {
       return;
     }
 
-    // Reset back button confirmation on any other key
-    self.back_pressed_once = false;
-
     // Default behavior for other keys
     match key {
-      KeyCode::Char('j') | KeyCode::Tab => self.focus_next(),
-      KeyCode::Char('k') | KeyCode::BackTab => self.focus_prev(),
+      KeyCode::Char('j') | KeyCode::Tab => {
+        self.back_pressed_once = false; // Reset when changing focus
+        self.focus_next();
+      }
+      KeyCode::Char('k') | KeyCode::BackTab => {
+        self.back_pressed_once = false; // Reset when changing focus
+        self.focus_prev();
+      }
       KeyCode::Char('i') | KeyCode::Char('a') => {
+        self.back_pressed_once = false; // Reset when entering insert mode
         self.on_enter_insert_mode(key);
         self.set_input_mode(InputMode::Insert);
       }
-      KeyCode::Enter => self.on_enter_pressed(),
-      _ => {}
+      KeyCode::Enter => {
+        // Don't reset back_pressed_once here - let on_enter_pressed handle it
+        self.on_enter_pressed();
+      }
+      _ => {
+        self.back_pressed_once = false; // Reset on any other key
+      }
     }
   }
 
