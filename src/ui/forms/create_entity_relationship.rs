@@ -204,7 +204,7 @@ impl CreateEntityRelationshipForm {
       .direction(Direction::Vertical)
       .constraints([
         Constraint::Length(2), // Title bar
-        Constraint::Length(8), // Category selector
+        Constraint::Length(6), // Category selector
         Constraint::Min(0),    // Flexible space for errors
         Constraint::Length(1), // Next button
       ])
