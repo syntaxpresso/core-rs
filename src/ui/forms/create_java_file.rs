@@ -567,7 +567,7 @@ impl CreateJavaFileForm {
         Constraint::Length(7), // File type selector (5 types + 2 borders)
         Constraint::Length(3), // File name input
         Constraint::Length(3), // Package name input
-        Constraint::Min(3),    // Flexible space for autocomplete + errors
+        Constraint::Min(3),    // Flexible space for autocomplete and errors (dynamically sized)
         Constraint::Length(1), // Confirm button
       ])
       .split(area);
@@ -587,12 +587,12 @@ impl CreateJavaFileForm {
     // Render autocomplete dropdown and error message in flexible space
     let flexible_area = chunks[4];
 
-    // Calculate autocomplete dropdown size (always 5 lines: 2 border + 3 items max)
-    let autocomplete_height = if self.show_autocomplete && !self.filtered_packages.is_empty() {
-      5 // Fixed height: 2 borders + 3 visible items
-    } else {
-      0
-    };
+    // Only show autocomplete for package name
+    let show_autocomplete = self.focused_field == FocusedField::PackageName
+      && self.show_autocomplete
+      && !self.filtered_packages.is_empty();
+
+    let autocomplete_height = if show_autocomplete { 5 } else { 0 };
 
     if autocomplete_height > 0 {
       let autocomplete_chunks = Layout::default()
@@ -602,7 +602,6 @@ impl CreateJavaFileForm {
 
       self.render_autocomplete_dropdown(frame, autocomplete_chunks[0]);
 
-      // Render error in remaining space
       if let Some(ref error_msg) = self.state.error_message {
         let error_paragraph =
           Paragraph::new(error_msg.as_str()).style(Style::default().fg(Color::Red)).block(
@@ -613,18 +612,15 @@ impl CreateJavaFileForm {
           );
         frame.render_widget(error_paragraph, autocomplete_chunks[1]);
       }
-    } else {
-      // No autocomplete, just render error if present
-      if let Some(ref error_msg) = self.state.error_message {
-        let error_paragraph =
-          Paragraph::new(error_msg.as_str()).style(Style::default().fg(Color::Red)).block(
-            Block::default()
-              .title("Error")
-              .borders(Borders::ALL)
-              .border_style(Style::default().fg(Color::Red)),
-          );
-        frame.render_widget(error_paragraph, flexible_area);
-      }
+    } else if let Some(ref error_msg) = self.state.error_message {
+      let error_paragraph =
+        Paragraph::new(error_msg.as_str()).style(Style::default().fg(Color::Red)).block(
+          Block::default()
+            .title("Error")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red)),
+        );
+      frame.render_widget(error_paragraph, flexible_area);
     }
 
     // Render confirm button
