@@ -267,11 +267,14 @@ impl CreateEnumFieldForm {
       FocusedField::BackButton => {
         if self.back_pressed_once {
           self.should_go_back = true;
+          self.back_pressed_once = false; // Reset after going back
         } else {
           self.back_pressed_once = true;
         }
       }
-      _ => {}
+      _ => {
+        self.back_pressed_once = false; // Reset if Enter pressed on other fields
+      }
     }
   }
 
@@ -597,46 +600,17 @@ impl CreateEnumFieldForm {
   }
 
   fn render_buttons(&self, frame: &mut Frame, area: Rect) {
-    let chunks = Layout::default()
-      .direction(Direction::Horizontal)
-      .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-      .split(area);
+    use crate::ui::form_trait::button_helpers::{ButtonType, render_two_button_layout};
 
-    // Render Back button
-    let is_back_focused = self.focused_field == FocusedField::BackButton;
-    let back_color = if self.back_pressed_once { Color::Red } else { Color::Yellow };
-    let back_text = if self.back_pressed_once { "Press again to go back" } else { "Back" };
-    let back_style = if is_back_focused {
-      Style::default().bg(back_color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(back_color)
-    };
-    let back_button = Paragraph::new(format!("[ {} ]", back_text))
-      .alignment(Alignment::Center)
-      .style(back_style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(back_button, chunks[0]);
-
-    // Render Confirm button
-    let is_confirm_focused = self.focused_field == FocusedField::ConfirmButton;
-    let color = match self.state.escape_handler.pressed_once {
-      true => Color::Red,
-      false => Color::Green,
-    };
-    let text = match self.state.escape_handler.pressed_once {
-      true => "Press esc again to close or any key to return",
-      false => "Confirm",
-    };
-    let confirm_style = if is_confirm_focused {
-      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(color)
-    };
-    let confirm_button = Paragraph::new(format!("[ {} ]", text))
-      .alignment(Alignment::Center)
-      .style(confirm_style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(confirm_button, chunks[1]);
+    render_two_button_layout(
+      frame,
+      area,
+      self.focused_field == FocusedField::BackButton,
+      self.focused_field == FocusedField::ConfirmButton,
+      self.back_pressed_once,
+      self.state.escape_handler.pressed_once,
+      ButtonType::Confirm,
+    );
   }
 
   fn render_title_bar(&self, frame: &mut Frame, area: Rect) {
@@ -763,19 +737,28 @@ impl FormBehavior for CreateEnumFieldForm {
       return;
     }
 
-    // Reset back button confirmation on any other key
-    self.back_pressed_once = false;
-
     // Default behavior for other keys
     match key {
-      KeyCode::Char('j') | KeyCode::Tab => self.focus_next(),
-      KeyCode::Char('k') | KeyCode::BackTab => self.focus_prev(),
+      KeyCode::Char('j') | KeyCode::Tab => {
+        self.back_pressed_once = false; // Reset when changing focus
+        self.focus_next();
+      }
+      KeyCode::Char('k') | KeyCode::BackTab => {
+        self.back_pressed_once = false; // Reset when changing focus
+        self.focus_prev();
+      }
       KeyCode::Char('i') | KeyCode::Char('a') => {
+        self.back_pressed_once = false; // Reset when entering insert mode
         self.on_enter_insert_mode(key);
         self.set_input_mode(InputMode::Insert);
       }
-      KeyCode::Enter => self.on_enter_pressed(),
-      _ => {}
+      KeyCode::Enter => {
+        // Don't reset back_pressed_once here - let on_enter_pressed handle it
+        self.on_enter_pressed();
+      }
+      _ => {
+        self.back_pressed_once = false; // Reset on any other key
+      }
     }
   }
 

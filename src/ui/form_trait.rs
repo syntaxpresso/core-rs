@@ -394,3 +394,129 @@ pub mod helpers {
     }
   }
 }
+
+/// Button rendering helpers for consistent UI across all forms
+pub mod button_helpers {
+  use ratatui::{
+    Frame,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, Paragraph},
+  };
+
+  /// Button type for rendering
+  #[derive(Debug, Clone, Copy, PartialEq)]
+  pub enum ButtonType {
+    Back,
+    Confirm,
+    Next,
+  }
+
+  /// Render a back button
+  pub fn render_back_button(
+    frame: &mut Frame,
+    area: Rect,
+    is_focused: bool,
+    back_pressed_once: bool,
+  ) {
+    let color = if back_pressed_once { Color::Red } else { Color::Yellow };
+    let text = if back_pressed_once { "Press again to go back" } else { "Back" };
+    let style = if is_focused {
+      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
+    } else {
+      Style::default().fg(color)
+    };
+    let button = Paragraph::new(format!("[ {} ]", text))
+      .alignment(Alignment::Center)
+      .style(style)
+      .block(Block::default().borders(Borders::empty()));
+    frame.render_widget(button, area);
+  }
+
+  /// Render a confirm button
+  pub fn render_confirm_button(
+    frame: &mut Frame,
+    area: Rect,
+    is_focused: bool,
+    escape_pressed_once: bool,
+  ) {
+    let color = if escape_pressed_once { Color::Red } else { Color::Green };
+    let text =
+      if escape_pressed_once { "Press esc again to close or any key to return" } else { "Confirm" };
+    let style = if is_focused {
+      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
+    } else {
+      Style::default().fg(color)
+    };
+    let button = Paragraph::new(format!("[ {} ]", text))
+      .alignment(Alignment::Center)
+      .style(style)
+      .block(Block::default().borders(Borders::empty()));
+    frame.render_widget(button, area);
+  }
+
+  /// Render a next button
+  pub fn render_next_button(
+    frame: &mut Frame,
+    area: Rect,
+    is_focused: bool,
+    escape_pressed_once: bool,
+  ) {
+    let color = if escape_pressed_once { Color::Red } else { Color::Green };
+    let text =
+      if escape_pressed_once { "Press esc again to close or any key to return" } else { "Next ->" };
+    let style = if is_focused {
+      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
+    } else {
+      Style::default().fg(color)
+    };
+    let button = Paragraph::new(format!("[ {} ]", text))
+      .alignment(Alignment::Center)
+      .style(style)
+      .block(Block::default().borders(Borders::empty()));
+    frame.render_widget(button, area);
+  }
+
+  /// Render a two-button layout (Back + Confirm/Next)
+  pub fn render_two_button_layout(
+    frame: &mut Frame,
+    area: Rect,
+    back_focused: bool,
+    right_focused: bool,
+    back_pressed_once: bool,
+    escape_pressed_once: bool,
+    right_button_type: ButtonType,
+  ) {
+    let chunks = Layout::default()
+      .direction(Direction::Horizontal)
+      .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+      .split(area);
+
+    // Render back button
+    render_back_button(frame, chunks[0], back_focused, back_pressed_once);
+
+    // Render right button based on type
+    match right_button_type {
+      ButtonType::Confirm => {
+        render_confirm_button(frame, chunks[1], right_focused, escape_pressed_once)
+      }
+      ButtonType::Next => render_next_button(frame, chunks[1], right_focused, escape_pressed_once),
+      ButtonType::Back => {} // Not used for right button
+    }
+  }
+
+  /// Render a single button (usually Confirm or Next)
+  pub fn render_single_button(
+    frame: &mut Frame,
+    area: Rect,
+    is_focused: bool,
+    escape_pressed_once: bool,
+    button_type: ButtonType,
+  ) {
+    match button_type {
+      ButtonType::Confirm => render_confirm_button(frame, area, is_focused, escape_pressed_once),
+      ButtonType::Next => render_next_button(frame, area, is_focused, escape_pressed_once),
+      ButtonType::Back => render_back_button(frame, area, is_focused, false),
+    }
+  }
+}
