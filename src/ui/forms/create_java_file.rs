@@ -12,7 +12,7 @@ use crate::commands::{create_java_file_command, get_all_packages_command};
 use crate::common::types::{
   java_file_type::JavaFileType, java_source_directory_type::JavaSourceDirectoryType,
 };
-use crate::ui::form_trait::{FormBehavior, FormState, InputMode, helpers};
+use crate::ui::form_trait::{FormBehavior, FormState, InputMode, button_helpers, helpers};
 
 /// Represents which field is currently focused
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -539,25 +539,13 @@ impl CreateJavaFileForm {
   }
 
   fn render_confirm_button(&self, frame: &mut Frame, area: Rect) {
-    let is_focused = self.focused_field == FocusedField::ConfirmButton;
-    let color = match self.state.escape_handler.pressed_once {
-      true => Color::Red,
-      false => Color::Green,
-    };
-    let text = match self.state.escape_handler.pressed_once {
-      true => "Press esc again to close or any key to return",
-      false => "Confirm",
-    };
-    let style = if is_focused {
-      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(color)
-    };
-    let button = Paragraph::new(format!("[ {} ]", text).to_string())
-      .alignment(Alignment::Center)
-      .style(style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(button, area);
+    button_helpers::render_single_button(
+      frame,
+      area,
+      self.focused_field == FocusedField::ConfirmButton,
+      self.state.escape_handler.pressed_once,
+      button_helpers::ButtonType::Confirm,
+    );
   }
 
   fn render_title_bar(&self, frame: &mut Frame, area: Rect) {

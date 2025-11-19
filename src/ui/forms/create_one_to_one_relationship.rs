@@ -15,7 +15,7 @@ use crate::common::types::cascade_type::CascadeType;
 use crate::common::types::mapping_type::MappingType;
 use crate::common::types::one_to_one_field_config::OneToOneFieldConfig;
 use crate::common::types::other_type::OtherType;
-use crate::ui::form_trait::{FormBehavior, FormState, InputMode, helpers};
+use crate::ui::form_trait::{FormBehavior, FormState, InputMode, button_helpers, helpers};
 
 /// Entity type information
 #[derive(Debug, Clone)]
@@ -881,111 +881,41 @@ impl CreateOneToOneRelationshipForm {
   }
 
   fn render_owning_phase_buttons(&self, frame: &mut Frame, area: Rect) {
-    let chunks = Layout::default()
-      .direction(Direction::Horizontal)
-      .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-      .split(area);
-
-    // Render Back button
-    let is_back_focused = self.focused_field == FocusedField::BackButton;
-    let back_color = if self.back_pressed_once { Color::Red } else { Color::Yellow };
-    let back_text = if self.back_pressed_once { "Press again to go back" } else { "Back" };
-    let back_style = if is_back_focused {
-      Style::default().bg(back_color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(back_color)
-    };
-    let back_button = Paragraph::new(format!("[ {} ]", back_text))
-      .alignment(Alignment::Center)
-      .style(back_style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(back_button, chunks[0]);
-
-    // Render Next/Confirm button depending on mapping type
     if self.is_bidirectional() {
-      // Show Next button for bidirectional
-      let is_next_focused = self.focused_field == FocusedField::NextButton;
-      let color = if self.state.escape_handler.pressed_once { Color::Red } else { Color::Green };
-      let text = if self.state.escape_handler.pressed_once {
-        "Press esc again to close or any key to return"
-      } else {
-        "Next ->"
-      };
-      let next_style = if is_next_focused {
-        Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-      } else {
-        Style::default().fg(color)
-      };
-      let next_button = Paragraph::new(format!("[ {} ]", text))
-        .alignment(Alignment::Center)
-        .style(next_style)
-        .block(Block::default().borders(Borders::empty()));
-      frame.render_widget(next_button, chunks[1]);
+      // Show Back + Next for bidirectional
+      button_helpers::render_two_button_layout(
+        frame,
+        area,
+        self.focused_field == FocusedField::BackButton,
+        self.focused_field == FocusedField::NextButton,
+        self.back_pressed_once,
+        self.state.escape_handler.pressed_once,
+        button_helpers::ButtonType::Next,
+      );
     } else {
-      // Show Confirm button for unidirectional
-      let is_confirm_focused = self.focused_field == FocusedField::ConfirmButton;
-      let color = match self.state.escape_handler.pressed_once {
-        true => Color::Red,
-        false => Color::Green,
-      };
-      let text = match self.state.escape_handler.pressed_once {
-        true => "Press esc again to close or any key to return",
-        false => "Confirm",
-      };
-      let confirm_style = if is_confirm_focused {
-        Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-      } else {
-        Style::default().fg(color)
-      };
-      let confirm_button = Paragraph::new(format!("[ {} ]", text))
-        .alignment(Alignment::Center)
-        .style(confirm_style)
-        .block(Block::default().borders(Borders::empty()));
-      frame.render_widget(confirm_button, chunks[1]);
+      // Show Back + Confirm for unidirectional
+      button_helpers::render_two_button_layout(
+        frame,
+        area,
+        self.focused_field == FocusedField::BackButton,
+        self.focused_field == FocusedField::ConfirmButton,
+        self.back_pressed_once,
+        self.state.escape_handler.pressed_once,
+        button_helpers::ButtonType::Confirm,
+      );
     }
   }
 
   fn render_buttons(&self, frame: &mut Frame, area: Rect) {
-    let chunks = Layout::default()
-      .direction(Direction::Horizontal)
-      .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-      .split(area);
-
-    // Render Back button
-    let is_back_focused = self.focused_field == FocusedField::BackButton;
-    let back_color = if self.back_pressed_once { Color::Red } else { Color::Yellow };
-    let back_text = if self.back_pressed_once { "Press again to go back" } else { "Back" };
-    let back_style = if is_back_focused {
-      Style::default().bg(back_color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(back_color)
-    };
-    let back_button = Paragraph::new(format!("[ {} ]", back_text))
-      .alignment(Alignment::Center)
-      .style(back_style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(back_button, chunks[0]);
-
-    // Render Confirm button
-    let is_confirm_focused = self.focused_field == FocusedField::ConfirmButton;
-    let color = match self.state.escape_handler.pressed_once {
-      true => Color::Red,
-      false => Color::Green,
-    };
-    let text = match self.state.escape_handler.pressed_once {
-      true => "Press esc again to close or any key to return",
-      false => "Confirm",
-    };
-    let confirm_style = if is_confirm_focused {
-      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(color)
-    };
-    let confirm_button = Paragraph::new(format!("[ {} ]", text))
-      .alignment(Alignment::Center)
-      .style(confirm_style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(confirm_button, chunks[1]);
+    button_helpers::render_two_button_layout(
+      frame,
+      area,
+      self.focused_field == FocusedField::BackButton,
+      self.focused_field == FocusedField::ConfirmButton,
+      self.back_pressed_once,
+      self.state.escape_handler.pressed_once,
+      button_helpers::ButtonType::Confirm,
+    );
   }
 
   pub fn render(&mut self, frame: &mut Frame) {

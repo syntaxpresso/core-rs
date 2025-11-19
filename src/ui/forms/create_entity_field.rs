@@ -7,7 +7,7 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
-use crate::ui::form_trait::{FormBehavior, FormState, InputMode, helpers};
+use crate::ui::form_trait::{FormBehavior, FormState, InputMode, button_helpers, helpers};
 use crate::ui::forms::create_basic_field::CreateBasicFieldForm;
 use crate::ui::forms::create_enum_field::CreateEnumFieldForm;
 use crate::ui::forms::create_id_field::CreateIdFieldForm;
@@ -235,25 +235,13 @@ impl CreateEntityFieldForm {
   }
 
   fn render_next_button(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
-    let is_focused = self.focused_field == FocusedField::NextButton;
-    let color = match self.state.escape_handler.pressed_once {
-      true => Color::Red,
-      false => Color::Green,
-    };
-    let text = match self.state.escape_handler.pressed_once {
-      true => "Press esc again to close or any key to return",
-      false => "Next",
-    };
-    let style = if is_focused {
-      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(color)
-    };
-    let button = Paragraph::new(format!("[ {} ]", text))
-      .alignment(Alignment::Center)
-      .style(style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(button, area);
+    button_helpers::render_single_button(
+      frame,
+      area,
+      self.focused_field == FocusedField::NextButton,
+      self.state.escape_handler.pressed_once,
+      button_helpers::ButtonType::Next,
+    );
   }
 
   fn render_child_form(&mut self, frame: &mut Frame) {
