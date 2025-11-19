@@ -166,7 +166,7 @@ impl CreateManyToOneRelationshipForm {
     let mut inverse_other_state = ListState::default();
     inverse_other_state.select(Some(0));
 
-    Self {
+    let mut form = Self {
       state: FormState::new(),
       phase: FormPhase::OwningConfiguration,
       mapping_type_index: 0,
@@ -198,7 +198,12 @@ impl CreateManyToOneRelationshipForm {
       entity_file_path,
       should_go_back: false,
       back_pressed_once: false,
-    }
+    };
+
+    // Initialize target entity and auto-generate field name
+    form.update_target_entity();
+
+    form
   }
 
   /// Fetch current entity information
