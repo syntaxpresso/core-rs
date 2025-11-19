@@ -11,7 +11,7 @@ use crate::commands::{
   create_jpa_entity_command, get_all_jpa_mapped_superclasses, get_all_packages_command,
 };
 use crate::common::types::java_source_directory_type::JavaSourceDirectoryType;
-use crate::ui::form_trait::{FormBehavior, FormState, InputMode, helpers};
+use crate::ui::form_trait::{FormBehavior, FormState, InputMode, button_helpers, helpers};
 
 /// Represents which field is currently focused
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -71,8 +71,12 @@ impl CreateJpaEntityForm {
     // Add "None" as the first option
     superclass_list.insert(0, "None".to_string());
 
-    let default_package =
-      package_list.first().cloned().unwrap_or_else(|| "com.example".to_string());
+    // Find the package with the smallest string length (shortest name)
+    let default_package = package_list
+      .iter()
+      .min_by_key(|pkg| pkg.len())
+      .cloned()
+      .unwrap_or_else(|| "com.example".to_string());
 
     let mut superclass_state = ListState::default();
     superclass_state.select(Some(0)); // Default to "None"
@@ -536,25 +540,13 @@ impl CreateJpaEntityForm {
   }
 
   fn render_confirm_button(&self, frame: &mut Frame, area: Rect) {
-    let is_focused = self.focused_field == FocusedField::ConfirmButton;
-    let color = match self.state.escape_handler.pressed_once {
-      true => Color::Red,
-      false => Color::Green,
-    };
-    let text = match self.state.escape_handler.pressed_once {
-      true => "Press esc again to close or any key to return",
-      false => "Confirm",
-    };
-    let style = if is_focused {
-      Style::default().bg(color).fg(Color::Black).add_modifier(Modifier::BOLD)
-    } else {
-      Style::default().fg(color)
-    };
-    let button = Paragraph::new(format!("[ {} ]", text))
-      .alignment(Alignment::Center)
-      .style(style)
-      .block(Block::default().borders(Borders::empty()));
-    frame.render_widget(button, area);
+    button_helpers::render_single_button(
+      frame,
+      area,
+      self.focused_field == FocusedField::ConfirmButton,
+      self.state.escape_handler.pressed_once,
+      button_helpers::ButtonType::Confirm,
+    );
   }
 
   fn render_title_bar(&self, frame: &mut Frame, area: Rect) {
@@ -569,9 +561,9 @@ impl CreateJpaEntityForm {
     let area = frame.area();
 
     // Calculate superclass list height dynamically
-    // Max 6 lines total (2 borders + 4 items visible)
-    // This allows scrolling if there are more than 4 items
-    let superclass_height = (self.superclass_list.len() as u16 + 2).min(6);
+    // Max 7 lines total (2 borders + 5 items visible)
+    // This allows scrolling if there are more than 5 items
+    let superclass_height = (self.superclass_list.len() as u16 + 2).min(7);
 
     let chunks = Layout::default()
       .direction(Direction::Vertical)
