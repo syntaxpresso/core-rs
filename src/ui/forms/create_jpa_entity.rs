@@ -71,8 +71,12 @@ impl CreateJpaEntityForm {
     // Add "None" as the first option
     superclass_list.insert(0, "None".to_string());
 
-    let default_package =
-      package_list.first().cloned().unwrap_or_else(|| "com.example".to_string());
+    // Find the package with the smallest string length (shortest name)
+    let default_package = package_list
+      .iter()
+      .min_by_key(|pkg| pkg.len())
+      .cloned()
+      .unwrap_or_else(|| "com.example".to_string());
 
     let mut superclass_state = ListState::default();
     superclass_state.select(Some(0)); // Default to "None"
@@ -569,9 +573,9 @@ impl CreateJpaEntityForm {
     let area = frame.area();
 
     // Calculate superclass list height dynamically
-    // Max 6 lines total (2 borders + 4 items visible)
-    // This allows scrolling if there are more than 4 items
-    let superclass_height = (self.superclass_list.len() as u16 + 2).min(6);
+    // Max 7 lines total (2 borders + 5 items visible)
+    // This allows scrolling if there are more than 5 items
+    let superclass_height = (self.superclass_list.len() as u16 + 2).min(7);
 
     let chunks = Layout::default()
       .direction(Direction::Vertical)
