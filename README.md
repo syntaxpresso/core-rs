@@ -43,6 +43,112 @@ Syntaxpresso Core is a stateless CLI application designed as a backend service f
 
 ## Technical Architecture
 
+<div align="center">
+  <img width="600" alt="syntaxpresso-architecture" src="https://private-user-images.githubusercontent.com/32070796/508597349-ddd3cd2d-3f03-4bbf-b855-8fc17248b3c2.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjM1MjQ4ODIsIm5iZiI6MTc2MzUyNDU4MiwicGF0aCI6Ii8zMjA3MDc5Ni81MDg1OTczNDktZGRkM2NkMmQtM2YwMy00YmJmLWI4NTUtOGZjMTcyNDhiM2MyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTExMTklMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMTE5VDAzNTYyMlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTZiMGNkOGM3MTJkYjMyZDA2MTMyMDdmNTk5YjZiMDA2ODk5Yjg1MDU0YmFhMTE5YTkxMzNjMzVlNzFmN2JjZDEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.sEUk4F1qZnjCQywE_kOSPs4VhqEvVnW-n4aj6N5hEKw" />
+</div>
+
+### Project Structure
+
+```
+src/
+├── commands/              # Command layer - CLI handlers
+│   ├── services/          # Business logic services
+│   ├── validators/        # Input validation
+│   └── *_command.rs       # Individual command implementations
+├── common/
+│   ├── services/          # Tree-Sitter AST manipulation services
+│   │   ├── annotation_service.rs
+│   │   ├── class_declaration_service.rs
+│   │   ├── field_declaration_service.rs
+│   │   ├── import_declaration_service.rs
+│   │   └── ...
+│   ├── types/             # Type definitions and domain models
+│   │   ├── java_basic_types.rs
+│   │   ├── java_field_modifier.rs
+│   │   ├── java_id_generation.rs
+│   │   └── ...
+│   ├── utils/             # Utility functions
+│   │   ├── case_util.rs
+│   │   ├── path_security_util.rs
+│   │   └── path_util.rs
+│   ├── query.rs           # Tree-Sitter query builder
+│   └── ts_file.rs         # Core Tree-Sitter file abstraction
+├── responses/             # Response type definitions
+├── ui/                    # Terminal UI (feature-gated with 'ui')
+│   ├── forms/             # Interactive TUI forms
+│   ├── form_trait.rs      # Form interface definition
+│   ├── runner.rs          # UI runtime
+│   └── widgets.rs         # Reusable UI components
+├── lib.rs                 # Library entry point
+└── main.rs                # CLI entry point
+
+tests/                     # Integration tests
+```
+
+### Architecture Layers
+
+The codebase follows a clean layered architecture with strict separation of concerns:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Frontend (IDE Plugin / Script / Terminal)                   │
+│  - Spawns binary with arguments                             │
+│  - Captures JSON from stdout                                │
+│  - Parses and consumes response                             │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Clap CLI Parser (main.rs)                                   │
+│  - Validates arguments                                      │
+│  - Routes to handler                                        │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+┌──────────────────────┐  ┌──────────────────────┐
+│ Interactive UI Path  │  │ Programmatic Path    │
+│ (#[cfg(feature="ui)])│  │ (Default)            │
+│                      │  │                      │
+│ - TUI forms          │  │ - Direct execution   │
+│ - User interaction   │  │ - Calls commands     │
+│ - Calls commands     │  │                      │
+└──────────┬───────────┘  └──────────┬───────────┘
+           │                         │
+           └──────────┬──────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Command Layer          │
+           │  src/commands/*.rs     │
+           │                        │
+           │  - Owns command names  │
+           │  - Validates inputs    │
+           │  - Calls services      │
+           │  - Builds Response<T>  │
+           └──────────┬─────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Service Layer          │
+           │  src/commands/services/│
+           │  src/common/services/  │
+           │                        │
+           │  - Business logic      │
+           │  - Tree-Sitter ops     │
+           │  - File I/O            │
+           │  - Returns domain objs │
+           └──────────┬─────────────┘
+                      ▼
+           ┌────────────────────────┐
+           │ Tree-Sitter Layer      │
+           │  src/common/ts_file.rs │
+           │                        │
+           │  - AST parsing         │
+           │  - Incremental updates │
+           │  - Query execution     │
+           │  - Node manipulation   │
+           └────────────────────────┘
+```
+
 ### Communication Model
 
 Syntaxpresso Core follows a **stateless request-response model**:
@@ -303,108 +409,6 @@ For standalone terminal usage, the UI-enabled binary provides interactive forms:
 - **Rust Toolchain**: Rust 2024 Edition or later
 - **Cargo**: Latest stable version
 - **Platform**: Linux, macOS, or Windows
-
-### Project Structure
-
-```
-src/
-├── commands/              # Command layer - CLI handlers
-│   ├── services/          # Business logic services
-│   ├── validators/        # Input validation
-│   └── *_command.rs       # Individual command implementations
-├── common/
-│   ├── services/          # Tree-Sitter AST manipulation services
-│   │   ├── annotation_service.rs
-│   │   ├── class_declaration_service.rs
-│   │   ├── field_declaration_service.rs
-│   │   ├── import_declaration_service.rs
-│   │   └── ...
-│   ├── types/             # Type definitions and domain models
-│   │   ├── java_basic_types.rs
-│   │   ├── java_field_modifier.rs
-│   │   ├── java_id_generation.rs
-│   │   └── ...
-│   ├── utils/             # Utility functions
-│   │   ├── case_util.rs
-│   │   ├── path_security_util.rs
-│   │   └── path_util.rs
-│   ├── query.rs           # Tree-Sitter query builder
-│   └── ts_file.rs         # Core Tree-Sitter file abstraction
-├── responses/             # Response type definitions
-├── ui/                    # Terminal UI (feature-gated with 'ui')
-│   ├── forms/             # Interactive TUI forms
-│   ├── form_trait.rs      # Form interface definition
-│   ├── runner.rs          # UI runtime
-│   └── widgets.rs         # Reusable UI components
-├── lib.rs                 # Library entry point
-└── main.rs                # CLI entry point
-
-tests/                     # Integration tests
-```
-
-### Architecture Layers
-
-The codebase follows a clean layered architecture with strict separation of concerns:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Frontend (IDE Plugin / Script / Terminal)                   │
-│  - Spawns binary with arguments                             │
-│  - Captures JSON from stdout                                │
-│  - Parses and consumes response                             │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Clap CLI Parser (main.rs)                                   │
-│  - Validates arguments                                      │
-│  - Routes to handler                                        │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-              ┌──────────┴──────────┐
-              ▼                     ▼
-┌──────────────────────┐  ┌──────────────────────┐
-│ Interactive UI Path  │  │ Programmatic Path    │
-│ (#[cfg(feature="ui)])│  │ (Default)            │
-│                      │  │                      │
-│ - TUI forms          │  │ - Direct execution   │
-│ - User interaction   │  │ - Calls commands     │
-│ - Calls commands     │  │                      │
-└──────────┬───────────┘  └──────────┬───────────┘
-           │                         │
-           └──────────┬──────────────┘
-                      ▼
-           ┌────────────────────────┐
-           │ Command Layer          │
-           │  src/commands/*.rs     │
-           │                        │
-           │  - Owns command names  │
-           │  - Validates inputs    │
-           │  - Calls services      │
-           │  - Builds Response<T>  │
-           └──────────┬─────────────┘
-                      ▼
-           ┌────────────────────────┐
-           │ Service Layer          │
-           │  src/commands/services/│
-           │  src/common/services/  │
-           │                        │
-           │  - Business logic      │
-           │  - Tree-Sitter ops     │
-           │  - File I/O            │
-           │  - Returns domain objs │
-           └──────────┬─────────────┘
-                      ▼
-           ┌────────────────────────┐
-           │ Tree-Sitter Layer      │
-           │  src/common/ts_file.rs │
-           │                        │
-           │  - AST parsing         │
-           │  - Incremental updates │
-           │  - Query execution     │
-           │  - Node manipulation   │
-           └────────────────────────┘
-```
 
 ### Key Components
 
