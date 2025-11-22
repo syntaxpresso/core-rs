@@ -178,7 +178,7 @@ This architecture ensures:
 
 1. **AST-First Approach**: All code modifications are performed through Tree-Sitter AST manipulation, not string concatenation or regex
 2. **Incremental Updates**: Uses Tree-Sitter's incremental parsing to efficiently update only affected portions of the syntax tree
-3. **Path Security**: All file operations validate paths against traversal attacks using canonicalization and containment checks
+3. **Path Security**: All file operations validate paths against traversal bugs using canonicalization and containment checks
 4. **Type Safety**: Strongly-typed commands and responses prevent runtime errors
 5. **Separation of Concerns**: Clear layering between CLI, commands, services, and Tree-Sitter operations
 
